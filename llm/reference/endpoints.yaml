@@ -1,0 +1,207 @@
+# file: llm/reference/endpoints.yaml
+# purpose: Complete API endpoint reference
+# updated: 2026-01-03
+# source: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-api/src/api/main.py
+
+metadata:
+  base_url: https://kitesforu-api-m6zqve5yda-uc.a.run.app
+  api_version: v1
+  auth_type: Bearer JWT (Clerk)
+
+endpoints:
+  health:
+    - method: GET
+      path: /v1/health
+      auth: none
+      purpose: Health check
+      response: { status: "ok" }
+
+  podcasts:
+    - method: POST
+      path: /v1/podcasts
+      auth: required
+      purpose: Create new podcast job
+      request_body:
+        type: CreateJobRequest
+        required_fields:
+          - topic: string (1-500 chars)
+          - duration_min: float (0.5-180)
+        optional_fields:
+          - style: PodcastStyle
+          - audience: string
+          - allow_premium: boolean
+      responses:
+        201: CreateJobResponse (job_id, status)
+        400: Validation error
+        401: Unauthorized
+        429: Quota exceeded
+
+    - method: GET
+      path: /v1/podcasts/{job_id}/status
+      auth: required
+      purpose: Get job status and progress
+      path_params:
+        job_id: string (UUID)
+      responses:
+        200: JobStatusResponse
+        404: Job not found
+
+    - method: GET
+      path: /v1/podcasts/{job_id}/result
+      auth: required
+      purpose: Get completed podcast result
+      path_params:
+        job_id: string (UUID)
+      responses:
+        200: JobResultResponse (audio_url, transcript)
+        404: Job not found
+        409: Job not completed
+
+    - method: PATCH
+      path: /v1/podcasts/{job_id}/answers
+      auth: required
+      purpose: Submit clarifier question answers
+      path_params:
+        job_id: string (UUID)
+      request_body:
+        type: ClarifierAnswers
+        fields:
+          answers: dict[string, string]
+      responses:
+        200: Updated job status
+        404: Job not found
+        409: Job not in CLARIFYING state
+
+    - method: GET
+      path: /v1/podcasts/{job_id}/research-plan
+      auth: required
+      purpose: Get research plan for approval
+      path_params:
+        job_id: string (UUID)
+      responses:
+        200: ResearchPlanData
+        404: Job not found
+
+    - method: POST
+      path: /v1/podcasts/{job_id}/research-plan/approve
+      auth: required
+      purpose: Approve research plan and start execution
+      path_params:
+        job_id: string (UUID)
+      responses:
+        200: Job status updated to RUNNING
+        404: Job not found
+        409: Plan already approved
+
+    - method: POST
+      path: /v1/podcasts/{job_id}/research-plan/edit
+      auth: required
+      purpose: Edit research plan (max 1 edit)
+      path_params:
+        job_id: string (UUID)
+      request_body:
+        type: ResearchPlanEdit
+        fields:
+          tasks: list[ResearchTask]
+      responses:
+        200: Updated plan
+        404: Job not found
+        409: Edit limit exceeded
+
+    - method: POST
+      path: /v1/podcasts/{job_id}/cancel
+      auth: required
+      purpose: Cancel a running job
+      path_params:
+        job_id: string (UUID)
+      responses:
+        200: Job cancelled
+        404: Job not found
+        409: Cannot cancel (already completed/failed)
+
+  user:
+    - method: GET
+      path: /v1/me/limits
+      auth: required
+      purpose: Get user tier and quota info
+      responses:
+        200: UserLimitsResponse
+
+    - method: GET
+      path: /v1/me/credits
+      auth: required
+      purpose: Get user credit balance
+      responses:
+        200: { credits_balance: int }
+
+    - method: GET
+      path: /v1/me/credits/history
+      auth: required
+      purpose: Get credit transaction history
+      responses:
+        200: list[CreditTransaction]
+
+  pricing:
+    - method: POST
+      path: /v1/pricing/calculate
+      auth: optional
+      purpose: Calculate job cost estimate
+      request_body:
+        type: PricingCalculateRequest
+        fields:
+          duration_min: float
+          allow_premium: boolean
+      responses:
+        200: PricingCalculateResponse
+
+  checkout:
+    - method: POST
+      path: /v1/checkout
+      auth: required
+      purpose: Create Stripe checkout session
+      request_body:
+        type: CheckoutRequest
+        fields:
+          credits: int
+      responses:
+        200: { checkout_url: string }
+
+    - method: POST
+      path: /v1/customer-portal
+      auth: required
+      purpose: Get Stripe customer portal URL
+      responses:
+        200: { portal_url: string }
+
+  webhooks:
+    - method: POST
+      path: /v1/webhooks/stripe
+      auth: Stripe signature
+      purpose: Handle Stripe webhook events
+      headers:
+        stripe-signature: required
+      responses:
+        200: Event processed
+        400: Invalid signature
+
+  admin:
+    - method: GET
+      path: /v1/admin/model-router/health
+      auth: admin
+      purpose: Get model router health status
+      responses:
+        200: ProviderHealthStatus
+
+    - method: GET
+      path: /v1/admin/model-router/quotas
+      auth: admin
+      purpose: Get provider quota status
+      responses:
+        200: QuotaStatus
+
+    - method: POST
+      path: /v1/admin/model-router/alerts/acknowledge
+      auth: admin
+      purpose: Acknowledge routing alerts
+      responses:
+        200: Alerts acknowledged

@@ -1,0 +1,138 @@
+# file: llm/reference/file-index.yaml
+# purpose: Complete file index for all KitesForU repositories
+# updated: 2026-01-03
+
+metadata:
+  base_path: /Users/vikrantbhosale/gitprojects/kitesforu
+  project: kitesforu
+  gcp_project: kitesforu-dev
+  region: us-central1
+
+repositories:
+  kitesforu-frontend:
+    path: ${base_path}/kitesforu-frontend
+    purpose: Next.js 14 frontend application
+    github: github.com/vikrantb/kitesforu-frontend
+    key_files:
+      entry_point: app/page.tsx
+      layout: app/layout.tsx
+      middleware: middleware.ts
+      config: next.config.js
+      types: shared/schemas.ts
+      package: package.json
+      dockerfile: Dockerfile
+      cicd: .github/workflows/ci.yml
+    directories:
+      app: app/                    # Next.js app router pages
+      components: components/       # React components
+      lib: lib/                    # Utilities
+      public: public/              # Static assets
+      e2e: e2e/                    # Playwright tests
+
+  kitesforu-api:
+    path: ${base_path}/kitesforu-api
+    purpose: FastAPI backend - job orchestration, auth, payments
+    github: github.com/vikrantb/kitesforu-api
+    key_files:
+      entry_point: src/api/main.py
+      config: src/api/config.py
+      job_services: src/api/job_services.py
+      credit_manager: src/api/credit_manager.py
+      stripe_service: src/api/stripe_service.py
+      auth: src/api/auth/clerk.py
+      database: src/api/database/firestore.py
+      dockerfile: Dockerfile
+      cicd: .github/workflows/ci.yml
+      env_example: .env.example
+    directories:
+      api: src/api/                # Main application
+      auth: src/api/auth/          # Authentication
+      routes: src/api/routes/      # API routes
+      services: src/api/services/  # Business logic
+      utils: src/api/utils/        # Utilities
+      tests: tests/                # pytest tests
+
+  kitesforu-workers:
+    path: ${base_path}/kitesforu-workers
+    purpose: Python workers - LLM, TTS, audio processing
+    github: github.com/vikrantb/kitesforu-workers
+    key_files:
+      server: src/workers/server.py
+      base_worker: src/workers/base.py
+      monolith: src/workers/monolith.py
+      dockerfile: Dockerfile
+      cicd: .github/workflows/ci.yml
+      model_catalog: src/config/model_catalog.csv
+    directories:
+      workers: src/workers/              # Main application
+      stages: src/workers/stages/        # Worker implementations
+      routing: src/workers/routing/      # Model router
+      tts: src/workers/tts/              # TTS providers
+      common: src/workers/common/        # Shared utilities
+      tests: tests/                      # pytest tests
+    worker_stages:
+      initiator: src/workers/stages/initiator/worker.py
+      research_planner: src/workers/stages/research/worker.py
+      planner: src/workers/stages/planner/worker.py
+      tools: src/workers/stages/tools/worker.py
+      script: src/workers/stages/script/worker.py
+      audio: src/workers/stages/audio/worker.py
+
+  kitesforu-schemas:
+    path: ${base_path}/kitesforu-schemas
+    purpose: Shared Pydantic models across all services
+    github: github.com/vikrantb/kitesforu-schemas
+    key_files:
+      init: src/kitesforu_schemas/__init__.py
+      enums: src/kitesforu_schemas/enums.py
+      models: src/kitesforu_schemas/models.py
+      constants: src/kitesforu_schemas/constants.py
+      tiers: src/kitesforu_schemas/tiers.py
+      pyproject: pyproject.toml
+      cicd: .github/workflows/ci.yml
+    directories:
+      schemas: src/kitesforu_schemas/    # Package source
+      tests: tests/                       # pytest tests
+
+  kitesforu-infrastructure:
+    path: ${base_path}/kitesforu-infrastructure
+    purpose: Terraform IaC for GCP resources
+    github: github.com/vikrantb/kitesforu-infrastructure
+    key_files:
+      main: terraform/main.tf
+      variables: terraform/variables.tf
+      outputs: terraform/outputs.tf
+      workers: terraform/cloud_run_workers.tf
+      pubsub: terraform/pubsub_workers.tf
+      firestore: terraform/firestore_indexes.tf
+      github_actions: terraform/github-actions.tf
+      dev_vars: terraform/dev.tfvars
+      cicd: .github/workflows/ci.yml
+    directories:
+      terraform: terraform/              # Terraform configs
+      scripts: scripts/                  # Deployment scripts
+
+  kitesforu-support:
+    path: ${base_path}/kitesforu-support
+    purpose: Operational scripts, monitoring, maintenance
+    github: github.com/vikrantb/kitesforu-support
+    key_files:
+      system_state: ../SYSTEM_STATE.md
+      diagnose_job: scripts/monitoring/diagnose-job.sh
+      check_logs: scripts/monitoring/check-logs.sh
+      clean_jobs: scripts/maintenance/clean_invalid_jobs.py
+      nuke_jobs: scripts/maintenance/nuke_all_jobs.py
+    directories:
+      monitoring: scripts/monitoring/    # Monitoring scripts
+      maintenance: scripts/maintenance/  # Maintenance scripts
+      docs: docs/                        # Documentation
+
+  kitetest:
+    path: ${base_path}/kitetest
+    purpose: E2E testing framework
+    key_files:
+      run_test: scripts/run_beta_e2e_test.py
+    test_credentials:
+      email: test@kitesforu.com
+      password: PatangUdav.15
+    target: beta.kitesforu.com

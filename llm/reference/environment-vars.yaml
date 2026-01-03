@@ -1,0 +1,149 @@
+# file: llm/reference/environment-vars.yaml
+# purpose: Environment variables across all services
+# updated: 2026-01-03
+
+metadata:
+  note: Values shown are defaults or placeholders. Actual secrets in Secret Manager.
+
+common:
+  MODE:
+    values: [DEV, CLOUD]
+    default: CLOUD
+    purpose: Execution mode (DEV uses local emulators)
+  GOOGLE_PROJECT_ID:
+    default: kitesforu-dev
+    purpose: GCP project ID
+  GOOGLE_REGION:
+    default: us-central1
+    purpose: GCP region
+
+api:
+  required:
+    OPENAI_API_KEY:
+      source: Secret Manager (openai-api-key)
+      purpose: OpenAI API access
+    CLERK_JWKS_URL:
+      format: https://[clerk-domain]/.well-known/jwks.json
+      purpose: Clerk JWT verification
+
+  optional:
+    ANTHROPIC_API_KEY:
+      source: Secret Manager (anthropic-api-key)
+      purpose: Anthropic Claude API
+    ELEVENLABS_API_KEY:
+      source: Secret Manager (elevenlabs-api-key)
+      purpose: ElevenLabs premium TTS
+    STRIPE_SECRET_KEY:
+      source: Secret Manager
+      purpose: Stripe payments
+    STRIPE_WEBHOOK_SECRET:
+      source: Secret Manager
+      purpose: Stripe webhook verification
+    FRONTEND_URL:
+      default: https://beta.kitesforu.com
+      purpose: CORS origin
+    LOG_LEVEL:
+      values: [DEBUG, INFO, WARNING, ERROR]
+      default: INFO
+      purpose: Logging verbosity
+
+  cloud_run:
+    GCS_BUCKET:
+      default: kitesforu-podcasts
+      purpose: Audio file storage
+    GCS_PUBLIC_PREFIX:
+      default: public/
+      purpose: Public audio path prefix
+    GCS_PRIVATE_PREFIX:
+      default: private/
+      purpose: Private audio path prefix
+    PUBLIC_BASE_URL:
+      default: https://www.kitesforu.com
+      purpose: Public URL for audio links
+    FREE_DAILY_JOBS:
+      default: "2"
+      purpose: Free tier daily job limit
+    FREE_MAX_DURATION_MIN:
+      default: "10"
+      purpose: Free tier max duration
+    JOB_STAGE_TIMEOUT_SEC:
+      default: "120"
+      purpose: Worker stage timeout
+    PUBSUB_TOPIC:
+      default: job-initiate
+      purpose: First pipeline topic
+
+workers:
+  required:
+    OPENAI_API_KEY:
+      source: Secret Manager (openai-api-key)
+      purpose: OpenAI LLM and TTS
+    ANTHROPIC_API_KEY:
+      source: Secret Manager (anthropic-api-key)
+      purpose: Anthropic Claude
+
+  optional:
+    GOOGLE_AI_API_KEY:
+      source: Secret Manager (google-ai-api-key)
+      purpose: Google Gemini
+    ELEVENLABS_API_KEY:
+      source: Secret Manager (elevenlabs-api-key)
+      purpose: ElevenLabs TTS
+    DEEPGRAM_API_KEY:
+      source: Secret Manager (deepgram-api-key)
+      purpose: Deepgram STT (future)
+
+  cloud_run:
+    WORKER_STAGE:
+      values: [job-initiate, job-research-planner, job-plan, job-execute-tools, job-script, job-audio]
+      purpose: Which worker stage this instance handles
+    GCS_BUCKET:
+      default: kitesforu-podcasts
+      purpose: Audio output storage
+    PUBSUB_VERIFICATION_TOKEN:
+      source: Secret Manager (pubsub-verification-token)
+      purpose: Pub/Sub push auth
+
+frontend:
+  build_time:
+    NEXT_PUBLIC_API_BASE:
+      cloud: https://kitesforu-api-m6zqve5yda-uc.a.run.app
+      local: http://localhost:8501
+      purpose: API server URL
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
+      format: pk_test_* or pk_live_*
+      purpose: Clerk frontend auth
+
+  runtime:
+    CLERK_SECRET_KEY:
+      source: Secret Manager (clerk-secret-key)
+      purpose: Clerk backend operations
+    NEXT_PUBLIC_PREVIEW_MODE:
+      values: ["true", "false"]
+      default: "false"
+      purpose: Enable preview features
+    NEXT_PUBLIC_LIMIT_TIME:
+      values: ["true", "false"]
+      default: "false"
+      purpose: Enforce time limits
+
+secret_manager:
+  secrets:
+    - name: openai-api-key
+      used_by: [api, workers]
+    - name: anthropic-api-key
+      used_by: [api, workers]
+    - name: google-ai-api-key
+      used_by: [workers]
+    - name: elevenlabs-api-key
+      used_by: [api, workers]
+    - name: deepgram-api-key
+      used_by: [workers]
+    - name: clerk-secret-key
+      used_by: [api, frontend]
+    - name: zoho-smtp-user
+      used_by: [api]
+    - name: zoho-smtp-pass
+      used_by: [api]
+    - name: pubsub-verification-token
+      used_by: [workers]

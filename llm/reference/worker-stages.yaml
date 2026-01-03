@@ -1,0 +1,234 @@
+# file: llm/reference/worker-stages.yaml
+# purpose: Worker pipeline specification
+# updated: 2026-01-03
+# source: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-workers/
+
+metadata:
+  description: Detailed worker stage specifications for podcast generation pipeline
+  execution_model: Pub/Sub push to Cloud Run
+
+pipeline_overview:
+  sequence:
+    1: initiator
+    2: research-planner
+    3: tools-executor
+    4: script-generator
+    5: audio-worker
+
+  total_stages: 5
+  average_duration: 5-15 minutes (depends on duration_min)
+  parallel_execution: false (sequential pipeline)
+
+stages:
+  initiator:
+    service_name: kitesforu-worker-initiator
+    pubsub_topic: job-initiate
+    pubsub_subscription: job-initiate-sub
+
+    purpose: Initialize job and handle clarifier questions
+    inputs:
+      - job_id: string (UUID)
+      - user_id: string (Clerk user ID)
+    outputs:
+      - clarifier_questions (optional)
+      - next_topic_message
+
+    responsibilities:
+      - Load job from Firestore
+      - Validate job inputs
+      - Generate clarifier questions if topic is ambiguous
+      - Wait for user answers if clarifying
+      - Publish to next stage when ready
+
+    next_topic: job-research-planner
+    timeout_seconds: 120
+    budget_percent: 0
+
+    error_handling:
+      - Retry on transient errors (max 5)
+      - Mark job failed on validation errors
+      - Log to workers-dead-letter on exhaustion
+
+  research-planner:
+    service_name: kitesforu-worker-research-planner
+    pubsub_topic: job-research-planner
+    pubsub_subscription: job-research-planner-sub
+
+    purpose: Create research plan for user approval (FEAT #42)
+    inputs:
+      - job_id: string
+      - user_id: string
+      - topic: string
+      - duration_min: float
+      - clarifier_answers: dict (optional)
+    outputs:
+      - research_plan: ResearchPlanData
+      - estimated_credits: float
+      - estimated_duration_seconds: int
+
+    responsibilities:
+      - Analyze topic and clarifier answers
+      - Generate 3-4 research tasks (web_search, url_extraction)
+      - Estimate credits and duration per task
+      - Create user-facing summary
+      - Save plan to Firestore
+      - Set awaiting_user_action=research_plan_approval
+      - Pause and wait for user approval
+
+    next_topic: job-execute-tools (after approval)
+    timeout_seconds: 180
+    budget_percent: 15
+
+    model_usage:
+      primary: openai/gpt-4o-mini
+      fallback: anthropic/claude-3-haiku
+      purpose: Research planning and task generation
+
+  tools-executor:
+    service_name: kitesforu-worker-tools
+    pubsub_topic: job-execute-tools
+    pubsub_subscription: job-execute-tools-sub
+
+    purpose: Execute research tools (web search, URL extraction)
+    inputs:
+      - job_id: string
+      - research_plan: ResearchPlanData
+    outputs:
+      - research_results: dict
+      - sources: list[string]
+
+    responsibilities:
+      - Execute approved research tasks
+      - Perform web searches via Tavily API
+      - Extract content from URLs
+      - Aggregate research findings
+      - Track credit usage per task
+      - Save results to Firestore
+
+    next_topic: job-script
+    timeout_seconds: 300
+    budget_percent: 30
+
+    external_apis:
+      - Tavily Search API
+      - URL content extraction
+
+    error_handling:
+      - Skip failed tasks, continue with available data
+      - Retry network errors (max 3 per task)
+      - Log partial results on timeout
+
+  script-generator:
+    service_name: kitesforu-worker-script
+    pubsub_topic: job-script
+    pubsub_subscription: job-script-sub
+
+    purpose: Generate podcast script via LLM
+    inputs:
+      - job_id: string
+      - research_results: dict
+      - topic: string
+      - duration_min: float
+      - style: PodcastStyle
+      - audience: string (optional)
+    outputs:
+      - script: dict (dialogue, metadata, segments)
+
+    responsibilities:
+      - Process research findings
+      - Generate podcast script matching style
+      - Format as host/guest dialogue
+      - Target specified duration
+      - Include segment markers
+      - Save script to Firestore
+
+    next_topic: job-audio
+    timeout_seconds: 480
+    budget_percent: 40
+
+    model_usage:
+      primary: openai/gpt-4o
+      fallback: anthropic/claude-3-5-sonnet
+      purpose: Script generation requiring creativity and structure
+
+    script_format:
+      segments: list of dialogue segments
+      speakers: [host, guest]
+      metadata: duration_estimate, word_count, topic_coverage
+
+  audio-worker:
+    service_name: kitesforu-worker-audio
+    pubsub_topic: job-audio
+    pubsub_subscription: job-audio-sub
+
+    purpose: TTS synthesis, audio mixing, GCS upload
+    inputs:
+      - job_id: string
+      - script: dict
+      - voice_quality: VoiceQuality
+    outputs:
+      - audio_url: string (GCS URL)
+      - waveform_png_url: string (optional)
+
+    responsibilities:
+      - Convert script segments to speech
+      - Apply different voices for host/guest
+      - Mix audio segments
+      - Add intro/outro (if configured)
+      - Generate waveform visualization (optional)
+      - Upload to GCS bucket
+      - Update job with result URLs
+      - Mark job COMPLETED
+
+    next_topic: null (final stage)
+    timeout_seconds: 300
+    budget_percent: 25
+
+    tts_providers:
+      primary: openai/tts-1 (standard) or openai/tts-1-hd (HD quality)
+      fallback: google/tts
+      premium: elevenlabs (if allow_premium=true)
+
+    storage:
+      bucket: kitesforu-podcasts
+      path_format: "{user_id}/{job_id}/podcast.mp3"
+      lifecycle: 2 days auto-delete
+
+message_format:
+  standard_fields:
+    job_id: string (UUID, required)
+    user_id: string (Clerk user ID, required)
+    timestamp: datetime (ISO 8601)
+    retry_count: int (default 0)
+    previous_stage: string (optional)
+
+  authentication:
+    method: OIDC token verification
+    service_account: kitesforu-worker@kitesforu-dev.iam.gserviceaccount.com
+
+dead_letter_handling:
+  topic: workers-dead-letter
+  subscription: workers-dead-letter-sub
+  retention: 7 days
+
+  conditions:
+    - Max retries exceeded (5)
+    - Unrecoverable error
+    - Worker crash/timeout
+
+  actions:
+    - Log for debugging
+    - Alert operations team
+    - Manual investigation required
+
+monitoring:
+  metrics:
+    - Processing time per stage
+    - Success/failure rate
+    - Credit usage per job
+    - Model API latency
+
+  logging:
+    - Structured JSON logs
+    - Cloud Logging integration
+    - Trace IDs for request tracking

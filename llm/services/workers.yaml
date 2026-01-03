@@ -1,0 +1,199 @@
+# file: llm/services/workers.yaml
+# purpose: Workers service specification
+# updated: 2026-01-03
+# source: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-workers/
+
+service:
+  name: kitesforu-workers
+  type: Background processors
+  framework: FastAPI (HTTP handlers for Pub/Sub push)
+  language: Python 3.11+
+  deployment_model: Multiple Cloud Run services from single codebase
+
+repository:
+  path: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-workers
+  structure:
+    src/workers/:
+      main.py: FastAPI app with stage routing
+      handlers/:
+        initiator.py: Job initialization handler
+        research_planner.py: Research plan generation
+        tools_executor.py: Research tool execution
+        script_generator.py: Script generation handler
+        audio_worker.py: TTS and audio processing
+      services/:
+        firestore_service.py: Firestore operations
+        pubsub_service.py: Pub/Sub publishing
+        llm_service.py: LLM provider abstraction
+        tts_service.py: TTS provider abstraction
+        storage_service.py: GCS operations
+      routing/:
+        model_router.py: Intelligent model selection
+        provider_health.py: Provider health tracking
+        quota_manager.py: Quota tracking
+      prompts/:
+        clarifier.py: Clarifier question prompts
+        research_planner.py: Research plan prompts
+        script_generator.py: Script generation prompts
+
+cloud_run_services:
+  - name: kitesforu-worker-initiator
+    stage: job-initiate
+    memory: 512Mi
+    max_instances: 3
+    ack_deadline: 120s
+
+  - name: kitesforu-worker-research-planner
+    stage: job-research-planner
+    memory: 512Mi
+    max_instances: 3
+    ack_deadline: 180s
+
+  - name: kitesforu-worker-tools
+    stage: job-execute-tools
+    memory: 1Gi
+    max_instances: 5
+    ack_deadline: 300s
+
+  - name: kitesforu-worker-script
+    stage: job-script
+    memory: 512Mi
+    max_instances: 3
+    ack_deadline: 480s
+
+  - name: kitesforu-worker-audio
+    stage: job-audio
+    memory: 1Gi
+    max_instances: 3
+    ack_deadline: 300s
+
+environment_variables:
+  required:
+    - OPENAI_API_KEY
+    - ANTHROPIC_API_KEY
+  optional:
+    - GOOGLE_AI_API_KEY
+    - ELEVENLABS_API_KEY
+    - DEEPGRAM_API_KEY
+  cloud_run:
+    - WORKER_STAGE
+    - GCS_BUCKET
+    - PUBSUB_VERIFICATION_TOKEN
+    - GOOGLE_PROJECT_ID
+
+model_router:
+  purpose: Intelligent selection of AI providers based on health, quota, cost
+  providers:
+    - openai
+    - anthropic
+    - google
+    - elevenlabs
+
+  selection_criteria:
+    - Provider health status
+    - Quota availability
+    - Cost per request
+    - Task type compatibility
+    - Quality requirements
+
+  fallback_chain:
+    llm:
+      primary: openai/gpt-4o
+      fallback_1: anthropic/claude-3-5-sonnet
+      fallback_2: google/gemini-1.5-pro
+    tts:
+      primary: openai/tts-1
+      fallback: google/tts
+      premium: elevenlabs/multilingual-v2
+
+  health_tracking:
+    check_interval: 60s
+    circuit_breaker_threshold: 5 failures
+    recovery_time: 300s
+
+  quota_management:
+    tracking: per-provider, per-model
+    alerts:
+      warning: 20% remaining
+      critical: 5% remaining
+    auto_failover: true
+
+llm_usage:
+  research_planner:
+    primary: openai/gpt-4o-mini
+    purpose: Generate research plan
+    prompt_type: structured_json
+
+  script_generator:
+    primary: openai/gpt-4o
+    purpose: Generate podcast script
+    prompt_type: creative_dialogue
+
+tts_usage:
+  standard:
+    provider: openai
+    model: tts-1
+    voices: [alloy, echo, fable, onyx, nova, shimmer]
+
+  hd:
+    provider: openai
+    model: tts-1-hd
+    voices: [alloy, echo, fable, onyx, nova, shimmer]
+
+  premium:
+    provider: elevenlabs
+    model: eleven_multilingual_v2
+    requires: allow_premium=true
+
+external_apis:
+  tavily:
+    purpose: Web search for research
+    rate_limit: 100 requests/min
+
+  url_extraction:
+    purpose: Content extraction from URLs
+    method: Custom scraping
+
+storage:
+  bucket: kitesforu-podcasts
+  audio_format: mp3
+  path_pattern: "{user_id}/{job_id}/podcast.mp3"
+
+pubsub_integration:
+  message_handling:
+    - Verify OIDC token
+    - Parse message data
+    - Route to appropriate handler
+    - ACK on success
+    - NACK on transient failure
+    - Dead-letter on permanent failure
+
+dependencies:
+  python_packages:
+    - fastapi
+    - google-cloud-firestore
+    - google-cloud-pubsub
+    - google-cloud-storage
+    - openai
+    - anthropic
+    - google-generativeai
+    - pydub
+    - kitesforu-schemas
+  external_services:
+    - Firestore
+    - Pub/Sub
+    - Cloud Storage
+    - OpenAI API
+    - Anthropic API
+    - Google AI API
+    - ElevenLabs API
+    - Tavily API
+
+testing:
+  framework: pytest
+  test_directory: tests/
+  mocking:
+    - LLM providers (avoid API costs)
+    - TTS providers (avoid API costs)
+    - Firestore (use emulator)
+    - Pub/Sub (use emulator)

@@ -1,0 +1,216 @@
+# file: llm/operations/rollback.yaml
+# purpose: Rollback commands and procedures
+# updated: 2026-01-03
+
+metadata:
+  environment: kitesforu-dev
+  region: us-central1
+
+rollback_strategy:
+  description: Cloud Run maintains revision history, enabling instant rollback
+  retention: Last 100 revisions per service
+  method: Traffic routing to previous revision
+
+list_revisions:
+  description: View available revisions for rollback
+  api:
+    command: |
+      gcloud run revisions list \
+        --service=kitesforu-api \
+        --region=us-central1 \
+        --format="table(name,active,created,status.conditions[0].status)"
+
+  workers:
+    command: |
+      for worker in initiator research-planner tools script audio; do
+        echo "=== kitesforu-worker-${worker} ==="
+        gcloud run revisions list \
+          --service=kitesforu-worker-${worker} \
+          --region=us-central1 \
+          --limit=5 \
+          --format="table(name,created)"
+      done
+
+  frontend:
+    command: |
+      gcloud run revisions list \
+        --service=kitesforu-frontend \
+        --region=us-central1 \
+        --format="table(name,active,created)"
+
+rollback_api:
+  description: Rollback API to previous revision
+  steps:
+    1_identify_revision:
+      command: |
+        gcloud run revisions list \
+          --service=kitesforu-api \
+          --region=us-central1 \
+          --limit=5
+
+    2_route_traffic:
+      command: |
+        gcloud run services update-traffic kitesforu-api \
+          --region=us-central1 \
+          --to-revisions={REVISION_NAME}=100
+
+    3_verify:
+      command: |
+        curl -s https://kitesforu-api-m6zqve5yda-uc.a.run.app/v1/health
+
+  quick_rollback:
+    description: Rollback to the previous serving revision
+    command: |
+      PREV_REV=$(gcloud run revisions list \
+        --service=kitesforu-api \
+        --region=us-central1 \
+        --format="value(name)" \
+        --limit=2 | tail -1)
+      gcloud run services update-traffic kitesforu-api \
+        --region=us-central1 \
+        --to-revisions=${PREV_REV}=100
+
+rollback_worker:
+  description: Rollback specific worker to previous revision
+  template:
+    command: |
+      WORKER_NAME={worker-name}  # e.g., kitesforu-worker-script
+
+      # List revisions
+      gcloud run revisions list \
+        --service=${WORKER_NAME} \
+        --region=us-central1 \
+        --limit=5
+
+      # Rollback to specific revision
+      gcloud run services update-traffic ${WORKER_NAME} \
+        --region=us-central1 \
+        --to-revisions={REVISION_NAME}=100
+
+  initiator:
+    command: |
+      gcloud run services update-traffic kitesforu-worker-initiator \
+        --region=us-central1 \
+        --to-revisions={REVISION_NAME}=100
+
+  research_planner:
+    command: |
+      gcloud run services update-traffic kitesforu-worker-research-planner \
+        --region=us-central1 \
+        --to-revisions={REVISION_NAME}=100
+
+  tools:
+    command: |
+      gcloud run services update-traffic kitesforu-worker-tools \
+        --region=us-central1 \
+        --to-revisions={REVISION_NAME}=100
+
+  script:
+    command: |
+      gcloud run services update-traffic kitesforu-worker-script \
+        --region=us-central1 \
+        --to-revisions={REVISION_NAME}=100
+
+  audio:
+    command: |
+      gcloud run services update-traffic kitesforu-worker-audio \
+        --region=us-central1 \
+        --to-revisions={REVISION_NAME}=100
+
+rollback_frontend:
+  description: Rollback frontend to previous revision
+  command: |
+    PREV_REV=$(gcloud run revisions list \
+      --service=kitesforu-frontend \
+      --region=us-central1 \
+      --format="value(name)" \
+      --limit=2 | tail -1)
+    gcloud run services update-traffic kitesforu-frontend \
+      --region=us-central1 \
+      --to-revisions=${PREV_REV}=100
+
+rollback_all_workers:
+  description: Rollback all workers to previous revisions
+  command: |
+    for worker in initiator research-planner tools script audio; do
+      SERVICE="kitesforu-worker-${worker}"
+      PREV_REV=$(gcloud run revisions list \
+        --service=${SERVICE} \
+        --region=us-central1 \
+        --format="value(name)" \
+        --limit=2 | tail -1)
+      echo "Rolling back ${SERVICE} to ${PREV_REV}"
+      gcloud run services update-traffic ${SERVICE} \
+        --region=us-central1 \
+        --to-revisions=${PREV_REV}=100
+    done
+
+canary_deployment:
+  description: Gradual rollout with traffic splitting
+  steps:
+    1_deploy_new:
+      command: |
+        # Deploy new revision (does not route traffic automatically)
+        gcloud run deploy kitesforu-api \
+          --image {NEW_IMAGE} \
+          --region us-central1 \
+          --no-traffic
+
+    2_canary_10_percent:
+      command: |
+        gcloud run services update-traffic kitesforu-api \
+          --region=us-central1 \
+          --to-revisions={NEW_REVISION}=10,{OLD_REVISION}=90
+
+    3_monitor:
+      description: Monitor error rates and latency
+      duration: 10-15 minutes
+
+    4_increase_50_percent:
+      command: |
+        gcloud run services update-traffic kitesforu-api \
+          --region=us-central1 \
+          --to-revisions={NEW_REVISION}=50,{OLD_REVISION}=50
+
+    5_full_rollout:
+      command: |
+        gcloud run services update-traffic kitesforu-api \
+          --region=us-central1 \
+          --to-revisions={NEW_REVISION}=100
+
+verify_rollback:
+  api:
+    command: |
+      # Check active revision
+      gcloud run services describe kitesforu-api \
+        --region=us-central1 \
+        --format="value(status.traffic[0].revisionName)"
+
+      # Health check
+      curl -s https://kitesforu-api-m6zqve5yda-uc.a.run.app/v1/health
+
+  workers:
+    command: |
+      for worker in initiator research-planner tools script audio; do
+        SERVICE="kitesforu-worker-${worker}"
+        ACTIVE=$(gcloud run services describe ${SERVICE} \
+          --region=us-central1 \
+          --format="value(status.traffic[0].revisionName)")
+        echo "${SERVICE}: ${ACTIVE}"
+      done
+
+emergency_rollback:
+  description: Immediate rollback for critical issues
+  steps:
+    1: Identify failing service from logs/alerts
+    2: List recent revisions
+    3: Route 100% traffic to known-good revision
+    4: Verify service health
+    5: Investigate root cause
+
+  example:
+    command: |
+      # Emergency rollback API
+      gcloud run services update-traffic kitesforu-api \
+        --region=us-central1 \
+        --to-revisions={KNOWN_GOOD_REVISION}=100

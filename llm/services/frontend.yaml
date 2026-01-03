@@ -1,0 +1,179 @@
+# file: llm/services/frontend.yaml
+# purpose: Frontend service specification
+# updated: 2026-01-03
+# source: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-frontend/
+
+service:
+  name: kitesforu-frontend
+  type: Web application
+  framework: Next.js 14 (App Router)
+  language: TypeScript
+  url: https://kitesforu-frontend-m6zqve5yda-uc.a.run.app
+  custom_domains:
+    - https://beta.kitesforu.com
+    - https://www.kitesforu.com
+
+repository:
+  path: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-frontend
+  structure:
+    src/:
+      app/:
+        page.tsx: Landing page
+        layout.tsx: Root layout with Clerk provider
+        dashboard/:
+          page.tsx: User dashboard
+        create/:
+          page.tsx: Podcast creation flow
+        jobs/:
+          "[id]/page.tsx": Job status and result view
+        pricing/:
+          page.tsx: Pricing page
+        sign-in/:
+          "[[...sign-in]]/page.tsx": Clerk sign-in
+        sign-up/:
+          "[[...sign-up]]/page.tsx": Clerk sign-up
+      components/:
+        ui/: shadcn/ui components
+        forms/: Form components
+        layout/: Layout components
+        podcast/: Podcast-specific components
+      lib/:
+        api.ts: API client
+        utils.ts: Utility functions
+      hooks/:
+        useJob.ts: Job status polling hook
+        useCredits.ts: Credits hook
+      styles/:
+        globals.css: Global styles (Tailwind)
+
+deployment:
+  platform: Cloud Run
+  region: us-central1
+  memory: 512Mi
+  cpu: 1
+  min_instances: 0
+  max_instances: 10
+  port: 3000
+  image_registry: us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/frontend
+
+environment_variables:
+  build_time:
+    - NEXT_PUBLIC_API_BASE: https://kitesforu-api-m6zqve5yda-uc.a.run.app
+    - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  runtime:
+    - CLERK_SECRET_KEY
+    - NEXT_PUBLIC_PREVIEW_MODE
+    - NEXT_PUBLIC_LIMIT_TIME
+
+authentication:
+  provider: Clerk
+  components:
+    - ClerkProvider (root layout)
+    - SignIn component
+    - SignUp component
+    - UserButton component
+  middleware: middleware.ts (protect routes)
+  protected_routes:
+    - /dashboard
+    - /create
+    - /jobs/*
+
+ui_framework:
+  base: shadcn/ui
+  styling: Tailwind CSS
+  icons: Lucide React
+  animations: Framer Motion
+
+key_pages:
+  landing:
+    path: /
+    auth: public
+    features:
+      - Hero section
+      - Feature highlights
+      - Pricing preview
+      - CTA buttons
+
+  dashboard:
+    path: /dashboard
+    auth: required
+    features:
+      - Job list
+      - Credits balance
+      - Quick create button
+      - Recent podcasts
+
+  create:
+    path: /create
+    auth: required
+    features:
+      - Topic input
+      - Duration selector
+      - Style picker
+      - Audience (optional)
+      - Credit estimate
+      - Submit button
+
+  job_status:
+    path: /jobs/[id]
+    auth: required
+    features:
+      - Progress indicator
+      - Stage display
+      - Clarifier questions (if needed)
+      - Research plan review (FEAT #42)
+      - Audio player (when complete)
+      - Download button
+
+  pricing:
+    path: /pricing
+    auth: public
+    features:
+      - Tier comparison
+      - Feature matrix
+      - CTA to checkout
+
+api_integration:
+  base_url: NEXT_PUBLIC_API_BASE
+  auth_header: Bearer token from Clerk
+  endpoints_used:
+    - POST /v1/podcasts (create job)
+    - GET /v1/podcasts/{job_id}/status (poll status)
+    - GET /v1/podcasts/{job_id}/result (get result)
+    - PATCH /v1/podcasts/{job_id}/answers (submit answers)
+    - GET /v1/podcasts/{job_id}/research-plan
+    - POST /v1/podcasts/{job_id}/research-plan/approve
+    - POST /v1/podcasts/{job_id}/research-plan/edit
+    - GET /v1/me/limits
+    - GET /v1/me/credits
+    - POST /v1/pricing/calculate
+    - POST /v1/checkout
+
+polling_strategy:
+  job_status:
+    interval: 3000ms
+    backoff: exponential
+    max_interval: 10000ms
+    stop_on: [completed, failed]
+
+dependencies:
+  npm_packages:
+    - next
+    - react
+    - typescript
+    - "@clerk/nextjs"
+    - tailwindcss
+    - "@radix-ui/*" (shadcn)
+    - lucide-react
+    - framer-motion
+    - swr (data fetching)
+
+testing:
+  framework: Jest + React Testing Library
+  e2e: Playwright (optional)
+  test_directory: __tests__/
+
+build:
+  command: npm run build
+  output: .next/
+  dockerfile: Dockerfile

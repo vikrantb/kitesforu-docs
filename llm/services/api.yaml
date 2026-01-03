@@ -1,0 +1,134 @@
+# file: llm/services/api.yaml
+# purpose: API service specification
+# updated: 2026-01-03
+# source: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-api/
+
+service:
+  name: kitesforu-api
+  type: REST API
+  framework: FastAPI
+  language: Python 3.11+
+  url: https://kitesforu-api-m6zqve5yda-uc.a.run.app
+
+repository:
+  path: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-api
+  structure:
+    src/api/:
+      main.py: FastAPI application entry point
+      routes/:
+        health.py: Health check endpoint
+        podcasts.py: Job management endpoints
+        users.py: User and credits endpoints
+        pricing.py: Pricing calculator
+        checkout.py: Stripe checkout integration
+        webhooks.py: Stripe webhooks
+        admin.py: Admin endpoints
+      services/:
+        auth.py: Clerk JWT verification
+        firestore_service.py: Firestore operations
+        pubsub_service.py: Pub/Sub publishing
+        stripe_service.py: Stripe integration
+        credits.py: Credit management
+      middleware/:
+        cors.py: CORS configuration
+        error_handler.py: Global error handling
+
+deployment:
+  platform: Cloud Run
+  region: us-central1
+  memory: 512Mi
+  cpu: 1
+  min_instances: 0
+  max_instances: 10
+  port: 8080
+  image_registry: us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/kitesforu-api
+
+authentication:
+  method: Bearer JWT
+  provider: Clerk
+  jwks_url: https://[clerk-domain]/.well-known/jwks.json
+  validation:
+    - Verify JWT signature
+    - Check expiration
+    - Extract user_id from sub claim
+
+environment_variables:
+  required:
+    - OPENAI_API_KEY
+    - CLERK_JWKS_URL
+  optional:
+    - ANTHROPIC_API_KEY
+    - ELEVENLABS_API_KEY
+    - STRIPE_SECRET_KEY
+    - STRIPE_WEBHOOK_SECRET
+    - FRONTEND_URL
+    - LOG_LEVEL
+  cloud_run:
+    - GCS_BUCKET
+    - PUBSUB_TOPIC
+    - GOOGLE_PROJECT_ID
+
+dependencies:
+  python_packages:
+    - fastapi
+    - uvicorn
+    - pydantic
+    - google-cloud-firestore
+    - google-cloud-pubsub
+    - stripe
+    - pyjwt
+    - kitesforu-schemas
+  external_services:
+    - Clerk (authentication)
+    - Stripe (payments)
+    - Firestore (database)
+    - Pub/Sub (messaging)
+
+endpoint_groups:
+  health:
+    - GET /v1/health
+  podcasts:
+    - POST /v1/podcasts
+    - GET /v1/podcasts/{job_id}/status
+    - GET /v1/podcasts/{job_id}/result
+    - PATCH /v1/podcasts/{job_id}/answers
+    - GET /v1/podcasts/{job_id}/research-plan
+    - POST /v1/podcasts/{job_id}/research-plan/approve
+    - POST /v1/podcasts/{job_id}/research-plan/edit
+    - POST /v1/podcasts/{job_id}/cancel
+  user:
+    - GET /v1/me/limits
+    - GET /v1/me/credits
+    - GET /v1/me/credits/history
+  pricing:
+    - POST /v1/pricing/calculate
+  checkout:
+    - POST /v1/checkout
+    - POST /v1/customer-portal
+  webhooks:
+    - POST /v1/webhooks/stripe
+  admin:
+    - GET /v1/admin/model-router/health
+    - GET /v1/admin/model-router/quotas
+    - POST /v1/admin/model-router/alerts/acknowledge
+
+error_handling:
+  global_handler: true
+  response_format:
+    error: string
+    message: string
+    details: object (optional)
+    request_id: string
+
+cors:
+  allowed_origins:
+    - https://beta.kitesforu.com
+    - https://www.kitesforu.com
+    - http://localhost:3000 (dev only)
+  allowed_methods: [GET, POST, PATCH, DELETE, OPTIONS]
+  allowed_headers: [Authorization, Content-Type]
+
+testing:
+  framework: pytest
+  test_directory: tests/
+  coverage_target: 80%

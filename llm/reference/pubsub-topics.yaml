@@ -1,0 +1,120 @@
+# file: llm/reference/pubsub-topics.yaml
+# purpose: Pub/Sub topic to worker mapping
+# updated: 2026-01-03
+# source: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-infrastructure/terraform/pubsub_workers.tf
+
+metadata:
+  project_id: kitesforu-dev
+  region: us-central1
+
+pipeline_flow:
+  # Order of execution
+  sequence:
+    1: job-initiate
+    2: job-research-planner
+    3: job-execute-tools
+    4: job-script
+    5: job-audio
+
+  # Backward compatibility
+  legacy:
+    job-plan: "Deprecated, use job-research-planner"
+
+topics:
+  job-initiate:
+    purpose: Start new job processing
+    worker: kitesforu-worker-initiator
+    subscription: job-initiate-sub
+    ack_deadline_seconds: 120
+    message_retention: 30m
+    retry_policy:
+      min_backoff: 10s
+      max_backoff: 600s
+      max_retries: 5
+    budget_percent: 0
+    next_topic: job-research-planner
+
+  job-research-planner:
+    purpose: Create research plan for user approval (FEAT #42)
+    worker: kitesforu-worker-research-planner
+    subscription: job-research-planner-sub
+    ack_deadline_seconds: 180
+    message_retention: 30m
+    retry_policy:
+      min_backoff: 10s
+      max_backoff: 600s
+      max_retries: 5
+    budget_percent: 15
+    next_topic: job-execute-tools
+    note: Pauses for user approval before continuing
+
+  job-plan:
+    purpose: Plan podcast script (legacy, backward compatible)
+    worker: kitesforu-worker-planner
+    subscription: job-plan-sub
+    ack_deadline_seconds: 180
+    message_retention: 30m
+    budget_percent: 15
+    deprecated: true
+
+  job-execute-tools:
+    purpose: Execute research tools (web search, extraction)
+    worker: kitesforu-worker-tools
+    subscription: job-execute-tools-sub
+    ack_deadline_seconds: 300
+    message_retention: 30m
+    retry_policy:
+      min_backoff: 10s
+      max_backoff: 600s
+      max_retries: 5
+    budget_percent: 30
+    next_topic: job-script
+
+  job-script:
+    purpose: Generate podcast script via LLM
+    worker: kitesforu-worker-script
+    subscription: job-script-sub
+    ack_deadline_seconds: 480
+    message_retention: 30m
+    retry_policy:
+      min_backoff: 10s
+      max_backoff: 600s
+      max_retries: 5
+    budget_percent: 40
+    next_topic: job-audio
+
+  job-audio:
+    purpose: TTS synthesis, audio mixing, GCS upload
+    worker: kitesforu-worker-audio
+    subscription: job-audio-sub
+    ack_deadline_seconds: 300
+    message_retention: 30m
+    retry_policy:
+      min_backoff: 10s
+      max_backoff: 600s
+      max_retries: 5
+    budget_percent: 25
+    next_topic: null
+    note: Final stage, updates job status to COMPLETED
+
+  workers-dead-letter:
+    purpose: Failed message handling for debugging
+    subscription: workers-dead-letter-sub
+    message_retention: 7d
+    retry_policy: null
+    note: Messages here indicate pipeline failures
+
+message_format:
+  required_fields:
+    - job_id: string (UUID)
+    - user_id: string (Clerk user ID)
+  optional_fields:
+    - timestamp: ISO 8601
+    - retry_count: int
+    - previous_stage: string
+
+subscription_push_config:
+  authentication:
+    type: OIDC
+    service_account: kitesforu-worker@kitesforu-dev.iam.gserviceaccount.com
+  timeout: 30s

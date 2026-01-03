@@ -1,0 +1,182 @@
+# file: llm/reference/gcp-resources.yaml
+# purpose: Complete GCP resource inventory
+# updated: 2026-01-03
+# source: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-infrastructure/terraform/
+
+metadata:
+  project_id: kitesforu-dev
+  region: us-central1
+  managed_by: Terraform
+
+cloud_run_services:
+  frontend:
+    name: kitesforu-frontend
+    url: https://kitesforu-frontend-m6zqve5yda-uc.a.run.app
+    port: 3000
+    memory: 512Mi
+    cpu: 1
+    min_instances: 0
+    max_instances: 10
+    image_registry: us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/frontend
+
+  api:
+    name: kitesforu-api
+    url: https://kitesforu-api-m6zqve5yda-uc.a.run.app
+    port: 8080
+    memory: 512Mi
+    cpu: 1
+    min_instances: 0
+    max_instances: 10
+    image_registry: us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/kitesforu-api
+
+  workers:
+    - name: kitesforu-worker-initiator
+      url: https://kitesforu-worker-initiator-m6zqve5yda-uc.a.run.app
+      pubsub_topic: job-initiate
+      memory: 512Mi
+      cpu: 1
+      max_instances: 3
+      ack_deadline: 120s
+
+    - name: kitesforu-worker-research-planner
+      url: https://kitesforu-worker-research-planner-m6zqve5yda-uc.a.run.app
+      pubsub_topic: job-research-planner
+      memory: 512Mi
+      cpu: 1
+      max_instances: 3
+      ack_deadline: 180s
+
+    - name: kitesforu-worker-planner
+      url: https://kitesforu-worker-planner-m6zqve5yda-uc.a.run.app
+      pubsub_topic: job-plan
+      memory: 512Mi
+      cpu: 1
+      max_instances: 3
+      ack_deadline: 180s
+
+    - name: kitesforu-worker-tools
+      url: https://kitesforu-worker-tools-m6zqve5yda-uc.a.run.app
+      pubsub_topic: job-execute-tools
+      memory: 1Gi
+      cpu: 1
+      max_instances: 5
+      ack_deadline: 300s
+
+    - name: kitesforu-worker-execute-tools
+      url: https://kitesforu-worker-execute-tools-m6zqve5yda-uc.a.run.app
+      pubsub_topic: job-execute-tools
+      memory: 1Gi
+      cpu: 1
+      max_instances: 5
+      ack_deadline: 300s
+
+    - name: kitesforu-worker-script
+      url: https://kitesforu-worker-script-m6zqve5yda-uc.a.run.app
+      pubsub_topic: job-script
+      memory: 512Mi
+      cpu: 1
+      max_instances: 3
+      ack_deadline: 480s
+
+    - name: kitesforu-worker-audio
+      url: https://kitesforu-worker-audio-m6zqve5yda-uc.a.run.app
+      pubsub_topic: job-audio
+      memory: 1Gi
+      cpu: 1
+      max_instances: 3
+      ack_deadline: 300s
+
+firestore:
+  database_id: "(default)"
+  mode: NATIVE
+  location: us-central1
+  collections: [podcast_jobs, users, credit_transactions, model_provider_health, model_quotas, model_router_alerts, routing_decisions]
+
+pubsub_topics:
+  - name: job-initiate
+    retention: 30m
+    subscription: job-initiate-sub
+    push_endpoint: kitesforu-worker-initiator
+
+  - name: job-research-planner
+    retention: 30m
+    subscription: job-research-planner-sub
+    push_endpoint: kitesforu-worker-research-planner
+
+  - name: job-plan
+    retention: 30m
+    subscription: job-plan-sub
+    push_endpoint: kitesforu-worker-planner
+
+  - name: job-execute-tools
+    retention: 30m
+    subscription: job-execute-tools-sub
+    push_endpoint: kitesforu-worker-tools
+
+  - name: job-script
+    retention: 30m
+    subscription: job-script-sub
+    push_endpoint: kitesforu-worker-script
+
+  - name: job-audio
+    retention: 30m
+    subscription: job-audio-sub
+    push_endpoint: kitesforu-worker-audio
+
+  - name: workers-dead-letter
+    retention: 7d
+    purpose: Failed message handling
+
+storage_buckets:
+  - name: kitesforu-podcasts
+    location: us-central1
+    lifecycle: 2 days (auto-delete)
+    purpose: Production audio output
+
+  - name: kitesforu-dev-podcasts
+    location: us-central1
+    lifecycle: 2 days
+    purpose: Development audio
+
+  - name: kitesforu-dev-worker-logs
+    location: us-central1
+    purpose: Worker debug logs
+
+artifact_registry:
+  docker:
+    name: kitesforu-docker
+    location: us-central1
+    images: [frontend, kitesforu-api, kitesforu-workers]
+  python:
+    name: kitesforu-python
+    location: us-central1
+    packages: [kitesforu-schemas]
+
+service_accounts:
+  - name: kitesforu-worker
+    purpose: Worker service identity
+    roles:
+      - roles/datastore.user
+      - roles/pubsub.publisher
+      - roles/pubsub.subscriber
+      - roles/storage.objectAdmin
+      - roles/secretmanager.secretAccessor
+      - roles/logging.logWriter
+
+  - name: github-actions
+    purpose: CI/CD deployment
+    roles:
+      - roles/run.admin
+      - roles/cloudbuild.builds.editor
+      - roles/iam.serviceAccountUser
+      - roles/storage.admin
+      - roles/artifactregistry.writer
+
+apis_enabled:
+  - cloudbuild.googleapis.com
+  - run.googleapis.com
+  - firestore.googleapis.com
+  - storage.googleapis.com
+  - pubsub.googleapis.com
+  - texttospeech.googleapis.com
+  - secretmanager.googleapis.com

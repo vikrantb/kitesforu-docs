@@ -1,0 +1,158 @@
+# file: llm/reference/firestore-schema.yaml
+# purpose: Firestore collection schemas
+# updated: 2026-01-03
+# source: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-schemas/src/kitesforu_schemas/models.py
+
+metadata:
+  database_id: "(default)"
+  mode: NATIVE
+  location: us-central1
+
+collections:
+  podcast_jobs:
+    purpose: Job state and metadata
+    document_id: job_id (UUID)
+    fields:
+      job_id: string (UUID)
+      user_id: string (Clerk user ID)
+      topic: string (1-500 chars)
+      duration_min: float (0.5-180)
+      style: PodcastStyle enum
+      audience: string (optional)
+      allow_premium: boolean
+      status: JobStatus enum
+      stage: JobStage enum
+      cost_estimate_cents: int
+      credits_deducted: int
+      created_at: timestamp
+      updated_at: timestamp
+      progress:
+        current_stage: string
+        percentage: int (0-100)
+        details: string
+      clarifier:
+        questions: list[ClarifierQuestion]
+        answers: map[string, string]
+      research_plan:
+        tasks: list[ResearchTask]
+        user_facing_summary: string
+        total_estimated_credits: int
+        total_estimated_duration_seconds: int
+        status: ResearchPlanStatus enum
+        edit_count: int (max 1)
+      result:
+        audio_url: string (GCS URL)
+        transcript: string
+        waveform_png_url: string (optional)
+        metadata: map
+      awaiting_user_action: string (optional, for clarifier/research plan)
+      error:
+        type: ErrorType enum
+        message: string
+        support_case_id: string
+    indexes:
+      - fields: [user_id, created_at DESC]
+      - fields: [status, created_at DESC]
+
+  users:
+    purpose: User data and subscription info
+    document_id: user_id (Clerk user ID)
+    fields:
+      user_id: string
+      email: string
+      tier: SubscriptionTier enum
+      credits_balance: int
+      subscription_status: string
+      subscription_period_end: timestamp (optional)
+      stripe_customer_id: string (optional)
+      created_at: timestamp
+      updated_at: timestamp
+      vip_override: boolean (optional)
+    indexes:
+      - fields: [email]
+      - fields: [stripe_customer_id]
+
+  credit_transactions:
+    purpose: Credit transaction history
+    document_id: transaction_id (UUID)
+    fields:
+      transaction_id: string
+      user_id: string
+      amount: int (positive=add, negative=deduct)
+      type: TransactionType enum
+      job_id: string (optional)
+      description: string
+      created_at: timestamp
+    indexes:
+      - fields: [user_id, created_at DESC]
+      - fields: [job_id]
+
+  model_provider_health:
+    purpose: LLM provider health tracking
+    document_id: provider_id
+    fields:
+      provider: string (openai, anthropic, google)
+      status: HealthStatus enum
+      last_check: timestamp
+      latency_ms: int
+      error_rate: float
+      available_models: list[string]
+    indexes:
+      - fields: [provider, timestamp DESC]
+
+  model_quotas:
+    purpose: Provider usage limits tracking
+    document_id: "{provider}_{model_id}"
+    fields:
+      provider: string
+      model_id: string
+      tokens_used: int
+      tokens_limit: int
+      requests_used: int
+      requests_limit: int
+      reset_at: timestamp
+    indexes:
+      - fields: [provider, model_id]
+      - fields: [provider, reset_at]
+
+  model_router_alerts:
+    purpose: Routing system alerts
+    document_id: alert_id (UUID)
+    fields:
+      alert_id: string
+      type: AlertType enum
+      severity: AlertSeverity enum
+      provider: string
+      message: string
+      fingerprint: string
+      acknowledged: boolean
+      created_at: timestamp
+    indexes:
+      - fields: [severity, timestamp]
+      - fields: [provider, timestamp]
+      - fields: [fingerprint, timestamp]
+
+  routing_decisions:
+    purpose: Audit log of model routing decisions
+    document_id: decision_id (UUID)
+    fields:
+      decision_id: string
+      job_id: string
+      task_type: string
+      selected_provider: string
+      selected_model: string
+      reasoning: string
+      alternatives_considered: list[string]
+      latency_ms: int
+      timestamp: timestamp
+    indexes:
+      - fields: [job_id, timestamp DESC]
+
+ttl_policies:
+  routing_decisions:
+    field: timestamp
+    duration: 30 days
+  model_router_alerts:
+    field: created_at
+    duration: 90 days
+    condition: acknowledged == true

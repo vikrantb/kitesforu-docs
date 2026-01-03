@@ -1,0 +1,239 @@
+# file: llm/reference/error-codes.yaml
+# purpose: Error types and remedies
+# updated: 2026-01-03
+# source: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-schemas/src/kitesforu_schemas/enums.py
+
+metadata:
+  description: Error classification and handling reference for KitesForU platform
+
+error_types:
+  authentication_error:
+    code: AUTHENTICATION_ERROR
+    http_status: 401
+    description: Invalid or expired authentication token
+    causes:
+      - Expired JWT token
+      - Invalid Clerk session
+      - Missing Authorization header
+    user_message: "Please sign in again to continue."
+    remediation:
+      user: Re-authenticate via Clerk
+      system: Token refresh flow
+    credits_refund: false
+
+  authorization_error:
+    code: AUTHORIZATION_ERROR
+    http_status: 403
+    description: User lacks permission for requested action
+    causes:
+      - Accessing another user's job
+      - Admin endpoint without admin role
+      - Feature not available for tier
+    user_message: "You don't have permission to perform this action."
+    remediation:
+      user: Check account permissions or upgrade tier
+      system: Verify user roles and job ownership
+    credits_refund: false
+
+  network_error:
+    code: NETWORK_ERROR
+    http_status: 503
+    description: External service communication failure
+    causes:
+      - LLM provider timeout
+      - TTS service unavailable
+      - Pub/Sub delivery failure
+    user_message: "A temporary network issue occurred. Please try again."
+    remediation:
+      user: Retry request
+      system: Check provider health, trigger failover
+    credits_refund: true
+    retry_eligible: true
+
+  validation_error:
+    code: VALIDATION_ERROR
+    http_status: 400
+    description: Invalid input data
+    causes:
+      - Topic too long (>500 chars)
+      - Duration out of range (<0.5 or >180 min)
+      - Invalid podcast style
+      - Malformed request body
+    user_message: "Please check your input and try again."
+    remediation:
+      user: Fix input validation errors
+      system: Return detailed field errors
+    credits_refund: false
+
+  quota_exceeded:
+    code: QUOTA_EXCEEDED
+    http_status: 429
+    description: Rate limit or usage quota exceeded
+    causes:
+      - Daily job limit reached (free tier)
+      - Monthly credit limit exhausted
+      - Provider API rate limit hit
+    user_message: "You've reached your usage limit. Please upgrade or wait."
+    remediation:
+      user: Upgrade subscription or wait for reset
+      system: Route to alternative provider if rate limited
+    credits_refund: false
+    retry_after: true
+
+  insufficient_credits:
+    code: INSUFFICIENT_CREDITS
+    http_status: 402
+    description: Not enough credits for requested operation
+    causes:
+      - Credit balance too low for job cost
+      - Premium feature requested without credits
+    user_message: "Insufficient credits. Please purchase more credits."
+    remediation:
+      user: Purchase credits or reduce job duration
+      system: Show pricing calculator
+    credits_refund: false
+
+  job_creation_error:
+    code: JOB_CREATION_ERROR
+    http_status: 500
+    description: Failed to create job in system
+    causes:
+      - Firestore write failure
+      - Pub/Sub publish failure
+      - Credit deduction failure
+    user_message: "Unable to create your podcast. Please try again."
+    remediation:
+      user: Retry request
+      system: Check Firestore and Pub/Sub health
+    credits_refund: true
+
+  job_processing_error:
+    code: JOB_PROCESSING_ERROR
+    http_status: 500
+    description: Error during job pipeline execution
+    causes:
+      - Worker crash
+      - LLM generation failure
+      - TTS synthesis failure
+      - Audio mixing error
+    user_message: "Your podcast encountered a processing error. Credits refunded."
+    remediation:
+      user: Report error, credits auto-refunded
+      system: Check worker logs, dead-letter queue
+    credits_refund: true
+
+  payment_error:
+    code: PAYMENT_ERROR
+    http_status: 402
+    description: Stripe payment processing failure
+    causes:
+      - Card declined
+      - Stripe API error
+      - Webhook verification failure
+    user_message: "Payment could not be processed. Please check your payment method."
+    remediation:
+      user: Update payment method in Stripe portal
+      system: Check Stripe dashboard for details
+    credits_refund: false
+
+  internal_server_error:
+    code: INTERNAL_SERVER_ERROR
+    http_status: 500
+    description: Unexpected system error
+    causes:
+      - Unhandled exception
+      - Configuration error
+      - Dependency failure
+    user_message: "An unexpected error occurred. Our team has been notified."
+    remediation:
+      user: Report error with case ID
+      system: Check logs, investigate root cause
+    credits_refund: true
+
+  unknown_error:
+    code: UNKNOWN_ERROR
+    http_status: 500
+    description: Unclassified error
+    causes:
+      - New error type not yet categorized
+      - Edge case not handled
+    user_message: "Something went wrong. Please try again or contact support."
+    remediation:
+      user: Contact support with error details
+      system: Analyze and categorize for future handling
+    credits_refund: true
+
+alert_types:
+  quota_warning:
+    severity: warning
+    description: Provider quota below 20% remaining
+    action: Monitor, prepare failover
+    notification: Slack alert
+
+  quota_critical:
+    severity: critical
+    description: Provider quota below 5% remaining
+    action: Activate failover, notify admin
+    notification: PagerDuty alert
+
+  quota_exhausted:
+    severity: emergency
+    description: Provider quota fully exhausted
+    action: Force failover to alternative provider
+    notification: Immediate incident
+
+  provider_unhealthy:
+    severity: warning
+    description: Provider latency or error rate elevated
+    action: Increase monitoring, prepare failover
+    notification: Slack alert
+
+  provider_unavailable:
+    severity: critical
+    description: Provider not responding
+    action: Execute failover, block new requests
+    notification: PagerDuty alert
+
+  failover_executed:
+    severity: info
+    description: Successfully switched to backup provider
+    action: Monitor backup performance
+    notification: Slack notification
+
+  rate_limit_hit:
+    severity: warning
+    description: Hit provider rate limit
+    action: Implement backoff, consider failover
+    notification: Slack alert
+
+health_status:
+  healthy:
+    description: All systems operational
+    action: Normal operation
+
+  degraded:
+    description: Performance below normal but functional
+    action: Monitor closely, prepare intervention
+
+  unavailable:
+    description: Service not responding
+    action: Failover, incident response
+
+http_status_mapping:
+  400: [validation_error]
+  401: [authentication_error]
+  402: [insufficient_credits, payment_error]
+  403: [authorization_error]
+  404: [job_not_found]
+  409: [job_state_conflict]
+  429: [quota_exceeded]
+  500: [job_creation_error, job_processing_error, internal_server_error, unknown_error]
+  503: [network_error]
+
+error_response_format:
+  structure:
+    error: "ERROR_CODE"
+    message: "Human-readable message"
+    details: {}  # Optional field-level errors
+    request_id: "UUID for tracking"
+    support_case_id: "If error reported"

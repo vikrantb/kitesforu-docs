@@ -1,0 +1,169 @@
+# file: llm/operations/deployment.yaml
+# purpose: Deployment commands and procedures
+# updated: 2026-01-03
+
+metadata:
+  environment: kitesforu-dev
+  region: us-central1
+  project_id: kitesforu-dev
+
+prerequisites:
+  authentication:
+    command: gcloud auth login && gcloud config set project kitesforu-dev
+    verify: gcloud config get project
+
+  docker:
+    command: gcloud auth configure-docker us-central1-docker.pkg.dev
+    verify: docker info
+
+deploy_api:
+  description: Deploy API service to Cloud Run
+  directory: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-api
+
+  manual_steps:
+    build:
+      command: |
+        docker build -t us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/kitesforu-api:latest .
+    push:
+      command: |
+        docker push us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/kitesforu-api:latest
+    deploy:
+      command: |
+        gcloud run deploy kitesforu-api \
+          --image us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/kitesforu-api:latest \
+          --region us-central1 \
+          --platform managed \
+          --allow-unauthenticated
+
+  script:
+    path: ./infra/deploy-api.sh
+    command: cd /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-api && ./infra/deploy-api.sh
+
+  verify:
+    command: |
+      curl -s https://kitesforu-api-m6zqve5yda-uc.a.run.app/v1/health | jq .
+    expected: '{"status": "ok"}'
+
+deploy_workers:
+  description: Deploy all worker services
+  directory: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-workers
+
+  services:
+    - kitesforu-worker-initiator
+    - kitesforu-worker-research-planner
+    - kitesforu-worker-tools
+    - kitesforu-worker-script
+    - kitesforu-worker-audio
+
+  manual_steps:
+    build:
+      command: |
+        docker build -t us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/kitesforu-workers:latest .
+    push:
+      command: |
+        docker push us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/kitesforu-workers:latest
+    deploy_each:
+      command: |
+        for worker in initiator research-planner tools script audio; do
+          gcloud run deploy kitesforu-worker-${worker} \
+            --image us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/kitesforu-workers:latest \
+            --region us-central1 \
+            --platform managed \
+            --set-env-vars WORKER_STAGE=job-${worker}
+        done
+
+  script:
+    path: ./infra/deploy-workers.sh
+    command: cd /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-workers && ./infra/deploy-workers.sh
+
+  verify:
+    command: |
+      gcloud run services list --region=us-central1 --filter="name~worker" --format="table(name,status)"
+
+deploy_frontend:
+  description: Deploy frontend to Cloud Run
+  directory: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-frontend
+
+  manual_steps:
+    build:
+      command: |
+        docker build \
+          --build-arg NEXT_PUBLIC_API_BASE=https://kitesforu-api-m6zqve5yda-uc.a.run.app \
+          --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${CLERK_PUBLISHABLE_KEY} \
+          -t us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/frontend:latest .
+    push:
+      command: |
+        docker push us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/frontend:latest
+    deploy:
+      command: |
+        gcloud run deploy kitesforu-frontend \
+          --image us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/frontend:latest \
+          --region us-central1 \
+          --platform managed \
+          --allow-unauthenticated
+
+  script:
+    path: ./infra/deploy-frontend.sh
+    command: cd /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-frontend && ./infra/deploy-frontend.sh
+
+  verify:
+    command: |
+      curl -s -o /dev/null -w "%{http_code}" https://kitesforu-frontend-m6zqve5yda-uc.a.run.app
+    expected: "200"
+
+deploy_schemas:
+  description: Publish schemas package to Artifact Registry
+  directory: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-schemas
+
+  steps:
+    build:
+      command: python -m build
+    upload:
+      command: |
+        twine upload \
+          --repository-url https://us-central1-python.pkg.dev/kitesforu-dev/kitesforu-python/ \
+          dist/*
+
+  verify:
+    command: |
+      pip index versions kitesforu-schemas \
+        --index-url https://us-central1-python.pkg.dev/kitesforu-dev/kitesforu-python/simple/
+
+deploy_all:
+  description: Deploy all services in order
+  order:
+    1: schemas (if changed)
+    2: api
+    3: workers
+    4: frontend
+
+  commands:
+    - cd /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-api && ./infra/deploy-api.sh
+    - cd /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-workers && ./infra/deploy-workers.sh
+    - cd /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-frontend && ./infra/deploy-frontend.sh
+
+ci_cd:
+  trigger: Push to main branch
+  workflow: .github/workflows/ci.yml
+  stages:
+    - lint_and_test
+    - build_docker
+    - push_to_registry
+    - deploy_to_cloud_run
+
+check_deployment:
+  list_services:
+    command: gcloud run services list --region=us-central1 --format="table(name,url,status)"
+
+  check_revisions:
+    command: |
+      gcloud run revisions list \
+        --service=kitesforu-api \
+        --region=us-central1 \
+        --format="table(name,active,created)"
+
+  check_logs:
+    command: |
+      gcloud run services logs read kitesforu-api \
+        --region=us-central1 \
+        --limit=50

@@ -1,0 +1,137 @@
+# file: llm/reference/job-states.yaml
+# purpose: Job state machine definition
+# updated: 2026-01-03
+# source: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-schemas/src/kitesforu_schemas/enums.py
+
+metadata:
+  description: Job status and stage state machines for podcast generation pipeline
+
+job_status:
+  description: High-level job status tracking
+  values:
+    queued:
+      description: Job created, waiting in queue
+      triggers: [job_created]
+      next_states: [clarifying, running, failed]
+    clarifying:
+      description: Waiting for user input (clarifier questions or research plan approval)
+      triggers: [needs_clarification, needs_research_plan_approval]
+      next_states: [queued, running, failed]
+    running:
+      description: Job actively processing through pipeline
+      triggers: [answers_received, plan_approved, auto_start]
+      next_states: [completed, failed]
+    completed:
+      description: Job finished successfully
+      triggers: [audio_uploaded]
+      next_states: []
+    failed:
+      description: Job failed with error
+      triggers: [error_occurred, timeout, worker_crash]
+      next_states: []
+
+job_stage:
+  description: Granular pipeline stage tracking
+  values:
+    queued:
+      description: Initial state, waiting to start
+      worker: null
+      next_stages: [research]
+    research:
+      description: Research and planning phase
+      worker: kitesforu-worker-initiator, kitesforu-worker-research-planner, kitesforu-worker-tools
+      next_stages: [script, failed]
+    script:
+      description: Script generation via LLM
+      worker: kitesforu-worker-script
+      next_stages: [voice, failed]
+    voice:
+      description: TTS synthesis
+      worker: kitesforu-worker-audio
+      next_stages: [mix, failed]
+    mix:
+      description: Audio mixing and processing
+      worker: kitesforu-worker-audio
+      next_stages: [publish, failed]
+    publish:
+      description: Upload to GCS and finalize
+      worker: kitesforu-worker-audio
+      next_stages: [completed, failed]
+    completed:
+      description: Successfully finished
+      worker: null
+      next_stages: []
+    failed:
+      description: Pipeline error
+      worker: null
+      next_stages: []
+
+research_plan_status:
+  description: Research plan approval workflow (FEAT #42)
+  values:
+    pending_approval:
+      description: Plan generated, awaiting user review
+      user_action: approve or edit
+      max_edits: 1
+    approved:
+      description: User approved plan, execution begins
+      user_action: none
+    editing:
+      description: User is editing the plan
+      user_action: submit edits
+    cancelled:
+      description: Plan cancelled by user
+      user_action: none
+
+state_transitions:
+  job_creation_flow:
+    description: Flow from job creation to first worker
+    steps:
+      1: "API creates job with status=QUEUED, stage=QUEUED"
+      2: "API publishes to job-initiate topic"
+      3: "Initiator worker receives message"
+      4: "If clarifier needed: status=CLARIFYING, await answers"
+      5: "If no clarifier: status=RUNNING, proceed to research-planner"
+
+  research_plan_flow:
+    description: Research plan approval flow (FEAT #42)
+    steps:
+      1: "Research planner generates plan"
+      2: "status=CLARIFYING, awaiting_user_action=research_plan_approval"
+      3: "User reviews plan via GET /v1/podcasts/{job_id}/research-plan"
+      4: "User approves via POST /v1/podcasts/{job_id}/research-plan/approve"
+      5: "Or edits via POST /v1/podcasts/{job_id}/research-plan/edit (max 1 edit)"
+      6: "On approval: status=RUNNING, publish to job-execute-tools"
+
+  completion_flow:
+    description: Flow to job completion
+    steps:
+      1: "Audio worker completes synthesis"
+      2: "Audio uploaded to GCS"
+      3: "Job status=COMPLETED, stage=COMPLETED"
+      4: "Firestore updated with audio_url"
+
+  failure_flow:
+    description: Flow when error occurs
+    steps:
+      1: "Worker encounters error"
+      2: "Job status=FAILED, stage=FAILED"
+      3: "Error details stored in job document"
+      4: "Message sent to dead-letter topic"
+      5: "Credits refunded if appropriate"
+
+progress_tracking:
+  format:
+    current_stage: "JobStage enum value"
+    percentage: "0-100 progress within current stage"
+    details: "Human-readable status message"
+
+  stage_percentages:
+    queued: 0
+    research: 10-30
+    script: 30-60
+    voice: 60-80
+    mix: 80-90
+    publish: 90-99
+    completed: 100
+    failed: null

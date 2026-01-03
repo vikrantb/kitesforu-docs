@@ -1,0 +1,286 @@
+# file: llm/operations/troubleshooting.yaml
+# purpose: Debug commands and common issues
+# updated: 2026-01-03
+
+metadata:
+  environment: kitesforu-dev
+  region: us-central1
+
+diagnose_job:
+  description: Debug a specific job by ID
+
+  get_job_document:
+    command: |
+      gcloud firestore documents describe \
+        --database="(default)" \
+        --collection=podcast_jobs \
+        --document={JOB_ID}
+
+  get_job_via_python:
+    command: |
+      python3 -c "
+      from google.cloud import firestore
+      db = firestore.Client(project='kitesforu-dev')
+      doc = db.collection('podcast_jobs').document('{JOB_ID}').get()
+      print(doc.to_dict())
+      "
+
+  check_fields:
+    - status: Current job status
+    - progress.stage: Current pipeline stage
+    - progress.pct: Percentage complete
+    - awaiting_user_action: If waiting for user
+    - error: Error details if failed
+
+check_logs:
+  api_logs:
+    command: |
+      gcloud run services logs read kitesforu-api \
+        --region=us-central1 \
+        --limit=100
+
+  worker_logs:
+    initiator:
+      command: |
+        gcloud run services logs read kitesforu-worker-initiator \
+          --region=us-central1 \
+          --limit=100
+
+    research_planner:
+      command: |
+        gcloud run services logs read kitesforu-worker-research-planner \
+          --region=us-central1 \
+          --limit=100
+
+    tools:
+      command: |
+        gcloud run services logs read kitesforu-worker-tools \
+          --region=us-central1 \
+          --limit=100
+
+    script:
+      command: |
+        gcloud run services logs read kitesforu-worker-script \
+          --region=us-central1 \
+          --limit=100
+
+    audio:
+      command: |
+        gcloud run services logs read kitesforu-worker-audio \
+          --region=us-central1 \
+          --limit=100
+
+  filter_by_job:
+    command: |
+      gcloud logging read \
+        'resource.type="cloud_run_revision" AND textPayload:"{JOB_ID}"' \
+        --limit=50 \
+        --format="table(timestamp,textPayload)"
+
+  filter_errors:
+    command: |
+      gcloud logging read \
+        'resource.type="cloud_run_revision" AND severity>=ERROR' \
+        --limit=50 \
+        --format="table(timestamp,resource.labels.service_name,textPayload)"
+
+pubsub_diagnostics:
+  check_dead_letter:
+    description: View failed messages
+    command: |
+      gcloud pubsub subscriptions pull workers-dead-letter-sub \
+        --limit=10 \
+        --auto-ack=false
+
+  check_subscription_backlog:
+    command: |
+      for topic in job-initiate job-research-planner job-execute-tools job-script job-audio; do
+        echo "=== ${topic}-sub ==="
+        gcloud pubsub subscriptions describe ${topic}-sub \
+          --format="value(messageRetentionDuration,ackDeadlineSeconds)"
+      done
+
+  purge_dead_letter:
+    description: Clear dead-letter queue after investigation
+    command: |
+      gcloud pubsub subscriptions seek workers-dead-letter-sub \
+        --time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+firestore_queries:
+  failed_jobs_recent:
+    command: |
+      python3 -c "
+      from google.cloud import firestore
+      from datetime import datetime, timedelta
+      db = firestore.Client(project='kitesforu-dev')
+      cutoff = datetime.utcnow() - timedelta(hours=24)
+      jobs = db.collection('podcast_jobs').where('status', '==', 'failed').where('created_at', '>=', cutoff).stream()
+      for job in jobs:
+          d = job.to_dict()
+          print(f\"{job.id}: {d.get('error', {}).get('message', 'Unknown')}\")
+      "
+
+  stuck_jobs:
+    description: Jobs in RUNNING state for too long
+    command: |
+      python3 -c "
+      from google.cloud import firestore
+      from datetime import datetime, timedelta
+      db = firestore.Client(project='kitesforu-dev')
+      cutoff = datetime.utcnow() - timedelta(minutes=30)
+      jobs = db.collection('podcast_jobs').where('status', '==', 'running').where('updated_at', '<', cutoff).stream()
+      for job in jobs:
+          d = job.to_dict()
+          print(f\"{job.id}: stage={d['progress']['stage']}, updated={d['updated_at']}\")
+      "
+
+  user_jobs:
+    command: |
+      python3 -c "
+      from google.cloud import firestore
+      db = firestore.Client(project='kitesforu-dev')
+      jobs = db.collection('podcast_jobs').where('user_id', '==', '{USER_ID}').order_by('created_at', direction=firestore.Query.DESCENDING).limit(10).stream()
+      for job in jobs:
+          d = job.to_dict()
+          print(f\"{job.id}: {d['status']} - {d['inputs']['topic'][:50]}\")
+      "
+
+storage_diagnostics:
+  list_user_files:
+    command: |
+      gsutil ls gs://kitesforu-podcasts/{USER_ID}/
+
+  check_audio_exists:
+    command: |
+      gsutil stat gs://kitesforu-podcasts/{USER_ID}/{JOB_ID}/podcast.mp3
+
+  download_audio:
+    command: |
+      gsutil cp gs://kitesforu-podcasts/{USER_ID}/{JOB_ID}/podcast.mp3 ./debug-audio.mp3
+
+common_issues:
+  job_stuck_clarifying:
+    symptoms:
+      - Job status = clarifying
+      - No progress for extended time
+    causes:
+      - User hasn't submitted answers
+      - Research plan awaiting approval
+    resolution:
+      - Check awaiting_user_action field
+      - Contact user or cancel job
+
+  job_stuck_running:
+    symptoms:
+      - Job status = running
+      - No progress update > 10 minutes
+    causes:
+      - Worker crashed
+      - Pub/Sub message lost
+      - External API timeout
+    resolution:
+      - Check worker logs
+      - Check dead-letter queue
+      - Manually republish message or mark failed
+
+  tts_failure:
+    symptoms:
+      - Job fails at voice stage
+      - Error mentions TTS or audio
+    causes:
+      - OpenAI TTS quota exceeded
+      - Script too long
+      - Invalid characters in script
+    resolution:
+      - Check model router health
+      - Verify script content
+      - Try fallback TTS provider
+
+  llm_failure:
+    symptoms:
+      - Job fails at script or research stage
+      - Error mentions model or API
+    causes:
+      - Provider quota exhausted
+      - Rate limit hit
+      - Invalid prompt
+    resolution:
+      - Check provider health in Firestore
+      - Review model_router_alerts collection
+      - Verify API keys in Secret Manager
+
+  authentication_error:
+    symptoms:
+      - 401 errors in API
+      - User can't access jobs
+    causes:
+      - Expired Clerk token
+      - Invalid JWKS configuration
+    resolution:
+      - User should re-login
+      - Verify CLERK_JWKS_URL env var
+
+health_checks:
+  api_health:
+    command: curl -s https://kitesforu-api-m6zqve5yda-uc.a.run.app/v1/health | jq .
+
+  provider_health:
+    command: |
+      python3 -c "
+      from google.cloud import firestore
+      db = firestore.Client(project='kitesforu-dev')
+      for doc in db.collection('model_provider_health').stream():
+          d = doc.to_dict()
+          print(f\"{doc.id}: {d['status']} - latency={d.get('latency_ms', 'N/A')}ms\")
+      "
+
+  recent_alerts:
+    command: |
+      python3 -c "
+      from google.cloud import firestore
+      db = firestore.Client(project='kitesforu-dev')
+      alerts = db.collection('model_router_alerts').where('acknowledged', '==', False).order_by('created_at', direction=firestore.Query.DESCENDING).limit(10).stream()
+      for a in alerts:
+          d = a.to_dict()
+          print(f\"{d['severity']}: {d['type']} - {d['message']}\")
+      "
+
+manual_interventions:
+  mark_job_failed:
+    description: Manually fail a stuck job
+    command: |
+      python3 -c "
+      from google.cloud import firestore
+      from datetime import datetime
+      db = firestore.Client(project='kitesforu-dev')
+      db.collection('podcast_jobs').document('{JOB_ID}').update({
+          'status': 'failed',
+          'progress.stage': 'failed',
+          'error': {'type': 'INTERNAL_SERVER_ERROR', 'message': 'Manual intervention - job stuck'},
+          'updated_at': datetime.utcnow()
+      })
+      print('Job marked as failed')
+      "
+
+  republish_message:
+    description: Republish job to topic
+    command: |
+      python3 -c "
+      from google.cloud import pubsub_v1
+      import json
+      publisher = pubsub_v1.PublisherClient()
+      topic = 'projects/kitesforu-dev/topics/{TOPIC_NAME}'
+      data = json.dumps({'job_id': '{JOB_ID}', 'user_id': '{USER_ID}'}).encode()
+      future = publisher.publish(topic, data)
+      print(f'Published: {future.result()}')
+      "
+
+  refund_credits:
+    description: Refund credits for failed job
+    command: |
+      python3 -c "
+      # Run via support scripts
+      # cd /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-support
+      # python scripts/refund_credits.py --job_id={JOB_ID}
+      print('Use support scripts for credit refunds')
+      "
