@@ -14,6 +14,85 @@ Testing strategy and practices for KitesForU services.
 | Integration | Service boundaries | pytest, supertest | Every PR |
 | E2E | Full user flows | Playwright | Release |
 
+## End-to-End (E2E) Tests
+
+**Location**: `/Users/vikrantbhosale/gitprojects/kitesforu/kitetest`
+
+The `kitetest` project contains Playwright-based E2E tests that verify the complete podcast creation flow through the UI.
+
+### Running E2E Tests
+
+```bash
+cd kitetest
+
+# Install dependencies
+npm install
+
+# Run staging/beta tests (against beta.kitesforu.com)
+npm run test:staging
+
+# Run local tests (requires local dev environment)
+npm run test:local
+```
+
+### Test Configuration
+
+| Environment | Base URL | Config File |
+|-------------|----------|-------------|
+| Local | `http://localhost:3000` | `playwright.config.local.ts` |
+| Staging | `https://beta.kitesforu.com` | `playwright.config.staging.ts` |
+
+### Test Credentials
+
+Test credentials are configured in `kitetest/.env`:
+- **Email**: `test@kitesforu.com`
+- **Password**: (see `.env` file)
+- **GCP Project**: `kitesforu-dev`
+
+### What E2E Tests Verify
+
+1. **Login via Clerk** - Authentication flow
+2. **Create podcast form** - Topic, duration, style selection
+3. **Clarification handling** - Answer clarifier questions
+4. **Firestore verification** - Job created and tracked
+5. **Cloud Logging** - All worker stages execute
+6. **Audio URL** - Final audio file is accessible
+7. **UI completion** - Progress page shows success
+
+### E2E Test Structure
+
+```
+kitetest/
+├── tests/
+│   ├── local/                    # Local environment tests
+│   │   └── podcast-creation.spec.ts
+│   ├── staging/                  # Staging/beta tests
+│   │   └── podcast-creation.spec.ts
+│   └── shared/                   # Shared helpers
+│       ├── auth.ts               # Clerk authentication
+│       ├── gcp-logger.ts         # Cloud Logging queries
+│       ├── firestore-checker.ts  # Firestore verification
+│       └── gcs-checker.ts        # Cloud Storage checks
+├── config/
+│   ├── app-config.json          # Test configuration
+│   └── test-loader.ts           # Config loader
+├── playwright.config.local.ts    # Local config
+├── playwright.config.staging.ts  # Staging config
+└── package.json
+```
+
+### Prerequisites for Local Tests
+
+Local E2E tests require the full development environment running:
+1. Frontend: `cd kitesforu-frontend && npm run dev`
+2. API: `cd kitesforu-api && python -m src.api.main`
+3. Workers: `cd kitesforu-workers && python -m src.workers.monolith`
+
+Or use the restart script if available:
+```bash
+./restart.sh
+```
+
 ## Repository Testing
 
 ### API (kitesforu-api)
