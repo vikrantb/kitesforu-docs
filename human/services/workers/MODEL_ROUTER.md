@@ -9,11 +9,11 @@ The Model Router intelligently selects AI providers based on health, quota avail
 ## How It Works
 
 ```
-Request → Check Health → Check Quota → Score Models → Select Best → Execute
-                                            ↓
-                                    (If fails)
-                                            ↓
-                                    Try Fallback
+Request → Load Catalog → Check Health → Check Quota → Score Models → Select Best
+                ↓                                            ↓
+     (Google Sheets or CSV)                          (If fails)
+                                                          ↓
+                                                    Try Fallback
 ```
 
 ## Supported Providers
@@ -229,3 +229,8 @@ gcloud firestore documents list \
   --order-by="timestamp desc" \
   --limit=10
 ```
+
+## Related Documentation
+
+- [Model Catalog](./MODEL_CATALOG.md) - Model catalog management and Google Sheets integration
+- [Pipeline](./PIPELINE.md) - Worker pipeline overview

@@ -108,7 +108,25 @@ User → Frontend (Next.js) → API (FastAPI) → Pub/Sub → Workers → GCS
 Models are selected via the **Model Router** based on:
 - User tier (trial, enthusiast, pro_creator, ultimate_creator)
 - Task type and complexity
-- Model capabilities from `config/model_catalog.csv`
+- Model capabilities from **Google Sheets** (with CSV fallback)
+
+#### Model Catalog Loading
+
+The model catalog supports dynamic updates via Google Sheets:
+
+```
+Google Sheet (MODEL_CATALOG_SHEET_ID)
+       ↓
+   TTL Cache (600s default)
+       ↓
+   Model Router
+       ↓
+   CSV Fallback (if Sheets unavailable)
+```
+
+- **Source**: Google Sheets (configured via `MODEL_CATALOG_SHEET_ID` secret)
+- **Cache TTL**: 600 seconds (configurable via `MODEL_CATALOG_CACHE_TTL`)
+- **Fallback**: `config/model_catalog.csv` when Sheets unavailable
 
 ### Complexity Routing
 
@@ -174,6 +192,10 @@ Tests verify: Login → Create → Clarification → Firestore → Logs → Audi
 - `ANTHROPIC_API_KEY` - Fallback LLM
 - `CLERK_JWKS_URL` - Auth verification
 - `STRIPE_SECRET_KEY` - Payments
+
+### Model Catalog
+- `MODEL_CATALOG_SHEET_ID` - Google Sheets spreadsheet ID (from Secret Manager)
+- `MODEL_CATALOG_CACHE_TTL` - Cache TTL in seconds (default: 600)
 
 ### GCP
 - `GOOGLE_PROJECT_ID`: kitesforu-dev
