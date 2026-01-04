@@ -53,12 +53,11 @@ The Model Catalog defines all available AI models, their capabilities, costs, an
 
 2. **Share with Service Accounts**
 
-   Share the sheet (Viewer permission) with ALL of these service accounts:
+   Share the sheet (Viewer permission) with these service accounts:
 
    | Service Account | Purpose |
    |-----------------|---------|
-   | `kitesforu-worker@kitesforu-dev.iam.gserviceaccount.com` | Cloud Run workers (production) |
-   | `kitesforu-backend-sa@kitesforu-dev.iam.gserviceaccount.com` | Local development |
+   | `kitesforu-worker@kitesforu-dev.iam.gserviceaccount.com` | Cloud Run workers (all 6 workers) |
    | `github-actions@kitesforu-dev.iam.gserviceaccount.com` | CI/CD pipelines |
 
    > **Note**: Uncheck "Notify people" when sharing (service accounts can't receive emails)
