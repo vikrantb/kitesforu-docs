@@ -91,9 +91,28 @@ When a topic is ambiguous (e.g., "AI"), the initiator generates questions like:
 - Aggregate findings
 - Handle API failures gracefully
 
+### Execution Modes
+
+The Tools Executor uses **tier-based routing** to select execution strategy:
+
+| User Tier | Executor | Description |
+|-----------|----------|-------------|
+| trial, enthusiast | DirectToolExecutor | Sequential tool execution |
+| pro_creator, ultimate_creator | AgenticExecutor | LLM-driven research with tool calling |
+
+**DirectToolExecutor**: Runs research tools sequentially without LLM orchestration. Cost-efficient for simpler research.
+
+**AgenticExecutor**: Uses an LLM with tool-calling capabilities to intelligently orchestrate research. Supports iterative refinement and dynamic query generation.
+
 ### External APIs
 - **Tavily**: Web search
 - **Custom**: URL content extraction
+
+### Cost Control
+- Per-iteration budget limits
+- 10% reserve for safety margin
+- Execution stops when budget ~90% consumed
+- Detailed cost breakdown per operation
 
 ### Error Handling
 - Skip failed tasks, continue with available data

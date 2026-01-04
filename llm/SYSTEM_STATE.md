@@ -3,7 +3,7 @@
 <!-- METADATA
 file: llm/SYSTEM_STATE.md
 purpose: Core system state for LLM agents
-updated: 2026-01-03
+updated: 2026-01-04
 -->
 
 ## Overview
@@ -100,8 +100,31 @@ User → Frontend (Next.js) → API (FastAPI) → Pub/Sub → Workers → GCS
 |----------|--------|-------|
 | OpenAI | gpt-4o, gpt-4o-mini, tts-1 | Primary |
 | Anthropic | claude-3-5-sonnet | Fallback |
-| Google | gemini-1.5-pro, tts | Fallback |
+| Google | gemini-1.5-pro, gemini-2.0-flash, tts | Fallback |
 | ElevenLabs | multilingual-v2 | Premium TTS |
+
+### Model Selection
+
+Models are selected via the **Model Router** based on:
+- User tier (trial, enthusiast, pro_creator, ultimate_creator)
+- Task type and complexity
+- Model capabilities from `config/model_catalog.csv`
+
+### Complexity Routing
+
+Non-premium tiers get complexity-based routing:
+- **SIMPLE**: Cheapest enabled model
+- **MODERATE**: Standard tier model
+- **COMPLEX**: Higher tier model
+
+Premium tiers (pro_creator, ultimate_creator) always get the best available model.
+
+### Research Execution
+
+| User Tier | Executor | Description |
+|-----------|----------|-------------|
+| trial, enthusiast | DirectToolExecutor | Sequential execution |
+| pro_creator, ultimate_creator | AgenticExecutor | LLM-driven with tool calling |
 
 ## Key Endpoints
 
