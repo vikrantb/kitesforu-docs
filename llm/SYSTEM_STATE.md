@@ -151,6 +151,21 @@ POST   /v1/checkout                         # Buy credits
 | Infrastructure | /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-infrastructure |
 | Support | /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-support |
 | Docs | /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-docs |
+| **E2E Tests** | /Users/vikrantbhosale/gitprojects/kitesforu/kitetest |
+
+## E2E Testing
+
+**Location**: `kitetest/` (Playwright-based UI tests)
+
+```bash
+# Run staging tests (beta.kitesforu.com)
+cd kitetest && npm run test:staging
+
+# Run local tests (requires local dev running)
+cd kitetest && npm run test:local
+```
+
+Tests verify: Login → Create → Clarification → Firestore → Logs → Audio → UI
 
 ## Environment Variables
 
