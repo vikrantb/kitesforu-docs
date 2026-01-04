@@ -51,9 +51,17 @@ The Model Catalog defines all available AI models, their capabilities, costs, an
    - Copy columns from `config/model_catalog.csv`
    - Name first sheet "models"
 
-2. **Share with Service Account**
-   - Share with: `worker@kitesforu-dev.iam.gserviceaccount.com`
-   - Permission: Viewer
+2. **Share with Service Accounts**
+
+   Share the sheet (Viewer permission) with ALL of these service accounts:
+
+   | Service Account | Purpose |
+   |-----------------|---------|
+   | `kitesforu-worker@kitesforu-dev.iam.gserviceaccount.com` | Cloud Run workers (production) |
+   | `kitesforu-backend-sa@kitesforu-dev.iam.gserviceaccount.com` | Local development |
+   | `github-actions@kitesforu-dev.iam.gserviceaccount.com` | CI/CD pipelines |
+
+   > **Note**: Uncheck "Notify people" when sharing (service accounts can't receive emails)
 
 3. **Configure Secret**
    ```bash
@@ -64,6 +72,12 @@ The Model Catalog defines all available AI models, their capabilities, costs, an
      --project=kitesforu-dev \
      --data-file=-
    ```
+
+### Current Production Sheet
+
+- **Spreadsheet**: [model_catalog](https://docs.google.com/spreadsheets/d/1vMUy8DiybcG1dAWU7TJpuZCFC_pYQxbewPdHTToxOi8/edit)
+- **Sheet ID**: `1vMUy8DiybcG1dAWU7TJpuZCFC_pYQxbewPdHTToxOi8`
+- **Tab**: `models`
 
 ## Model Catalog Schema
 
