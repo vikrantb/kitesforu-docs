@@ -170,6 +170,42 @@ POST   /v1/checkout                         # Buy credits
 | Support | /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-support |
 | Docs | /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-docs |
 | **E2E Tests** | /Users/vikrantbhosale/gitprojects/kitesforu/kitetest |
+| **QA Tool** | /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-qa |
+
+## Quality Assurance (kitesforu-qa)
+
+**Repository**: github.com/vikrantb/kitesforu-qa
+
+6-stage quality assurance CLI for validating podcast audio and content:
+
+| Stage | Check | Tool | Cost |
+|-------|-------|------|------|
+| 1 | Format | ffprobe | FREE |
+| 2 | Pronunciation | Whisper + WER | FREE |
+| 3 | Audio Quality | MOS score | FREE |
+| 4 | Prosody | Pitch analysis | FREE |
+| 5 | Content | Gemini LLM | ~$0.001 |
+| 6 | Voice Match | Gender/persona | FREE |
+
+### QA Commands
+
+```bash
+# Full QA on audio
+kqa run --audio audio.mp3 --request "..." --script script.txt
+
+# Quick script check (free, no LLM)
+kqa check-script --script script.txt --request "..." --quick
+
+# E2E test via API
+kqa e2e --topic "Topic" --duration 10
+```
+
+### Thresholds
+
+- **WER**: ≤ 10% word error rate
+- **MOS**: ≥ 3.5 mean opinion score
+- **Content**: ≥ 7.0 overall score
+- **Pitch**: ≥ 20 Hz std (English)
 
 ## E2E Testing
 

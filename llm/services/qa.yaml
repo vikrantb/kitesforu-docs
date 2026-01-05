@@ -1,0 +1,255 @@
+# kitesforu-qa Service Specification
+# Audio & Content Quality Assurance System
+
+service:
+  name: kitesforu-qa
+  version: 0.1.0
+  type: cli-tool
+  language: python
+  package_name: kitesforu_qa
+  repository: https://github.com/vikrantb/kitesforu-qa
+
+description: |
+  6-stage quality assurance system for podcast audio and content validation.
+  Can be used standalone via CLI or integrated into the pipeline for automated QA.
+
+installation:
+  pip: pip install kitesforu-qa
+  source: |
+    git clone https://github.com/vikrantb/kitesforu-qa
+    cd kitesforu-qa
+    pip install -e .
+  dependencies:
+    - ffmpeg (system)
+    - libsndfile1 (system)
+
+cli_commands:
+  run:
+    description: Run full QA pipeline on single podcast
+    required_args:
+      - --audio: Audio file path or GCS URI (gs://...)
+      - --request: Original user request/topic
+    optional_args:
+      - --script: Path to script file
+      - --job-id: Job ID for tracking
+      - --language: Language code (en, es, hi, etc.)
+      - --topic: Podcast topic for voice matching
+      - --expected-duration: Expected duration in seconds
+      - --expected-hosts: Number of expected hosts
+      - --verbose/-v: Verbose output
+      - --output/-o: Output file path (JSON)
+      - --format: json|markdown|html
+    example: |
+      kqa run --audio gs://bucket/audio.mp3 --request "Create podcast about AI"
+
+  check-script:
+    description: Validate script before audio generation
+    required_args:
+      - --script: Path to script file
+      - --request: Original user request
+    optional_args:
+      - --duration: Target duration in minutes (default 10)
+      - --quick: Run only free checks (no LLM)
+      - --verbose/-v: Verbose output
+    example: |
+      kqa check-script --script script.txt --request "..." --quick
+
+  e2e:
+    description: End-to-end test via KitesForU API
+    required_args:
+      - --topic: Podcast topic
+    optional_args:
+      - --duration: Duration in minutes
+      - --api-url: API endpoint URL
+      - --api-key: API key (or KITESFORU_API_KEY env)
+      - --wait-timeout: Max wait time in seconds
+    example: |
+      kqa e2e --topic "The future of AI" --duration 10
+
+  batch:
+    description: Process multiple podcasts from CSV
+    required_args:
+      - --input: Input CSV file
+      - --output: Output directory
+    optional_args:
+      - --parallel: Number of parallel workers
+    csv_format: job_id,audio_path,request,language
+
+stages:
+  - stage: 1
+    name: format
+    description: File validity, codec, duration validation
+    tool: ffprobe
+    cost: FREE
+    checks:
+      - File exists and is readable
+      - Valid audio codec (mp3, wav, m4a, ogg, flac)
+      - Duration within expected range
+      - Sample rate >= 16000 Hz
+      - Bitrate >= 64 kbps
+    output:
+      valid: boolean
+      format: string
+      duration_seconds: float
+      sample_rate: int
+      bitrate: int
+
+  - stage: 2
+    name: pronunciation
+    description: Word accuracy via transcription comparison
+    tool: openai-whisper + jiwer
+    cost: FREE
+    threshold: WER <= 10%
+    process:
+      - Transcribe audio with Whisper
+      - Compare to original script
+      - Calculate Word Error Rate (WER)
+    output:
+      word_error_rate: float
+      accuracy_percent: float
+      transcript: string
+
+  - stage: 3
+    name: quality
+    description: Audio quality assessment (MOS score)
+    tool: UTMOS or librosa fallback
+    cost: FREE
+    threshold: MOS >= 3.5
+    mos_scale:
+      5: Excellent
+      4: Good
+      3: Okay
+      2: Poor
+      1: Bad
+    output:
+      mos_score: float
+      quality_level: string
+
+  - stage: 4
+    name: prosody
+    description: Speech naturalness analysis
+    tool: librosa (pyin pitch detection)
+    cost: FREE
+    checks:
+      - Pitch variation (not monotone)
+      - Dynamic range
+      - Language-specific thresholds
+    threshold: pitch_std >= 20 Hz (English)
+    output:
+      pitch_mean_hz: float
+      pitch_std_hz: float
+      is_monotone: boolean
+      dynamic_range: float
+
+  - stage: 5
+    name: content
+    description: Script quality evaluation
+    tool: Gemini Flash LLM
+    cost: ~$0.001/script
+    dimensions:
+      - topic: Topic adherence (1-10)
+      - structure: Intro/flow/conclusion (1-10)
+      - engagement: Hooks and stories (1-10)
+      - speakability: Sentence length (1-10)
+      - accuracy: Claims grounded (1-10)
+      - style: Tone match (1-10)
+    quick_checks_free:
+      - Word count vs target duration
+      - Intro/outro detection
+      - Long sentence detection
+      - Repetition detection (LLM loop)
+    output:
+      overall_score: float
+      scores: object
+      red_flags: array
+
+  - stage: 6
+    name: voice_matching
+    description: Voice/persona validation
+    tool: librosa + pyannote
+    cost: FREE
+    checks:
+      - Placeholder name detection (Host 1, Speaker 2)
+      - Gender detection via F0 pitch
+      - Gender-name consistency
+      - Voice age estimation
+      - Topic-voice appropriateness
+      - Multiple speaker detection
+    gender_thresholds:
+      male_f0: 85-180 Hz
+      female_f0: 165-255 Hz
+    output:
+      placeholder_detected: boolean
+      detected_gender: string
+      gender_match: boolean
+      estimated_age: string
+      speaker_count: int
+
+environment_variables:
+  required:
+    - name: GOOGLE_AI_API_KEY
+      description: Gemini API key for content evaluation
+      required_for: content stage
+  optional:
+    - name: HUGGINGFACE_TOKEN
+      description: HuggingFace token for speaker diarization
+    - name: KITESFORU_API_KEY
+      description: API key for e2e tests
+    - name: GCP_PROJECT
+      description: GCP project for GCS access
+
+language_support:
+  - en: English
+  - es: Spanish
+  - fr: French
+  - de: German
+  - hi: Hindi
+  - ja: Japanese
+  - zh: Chinese
+
+output_format:
+  json_example: |
+    {
+      "job_id": "job_abc123",
+      "overall_passed": true,
+      "stages": {
+        "format": {"valid": true, "duration_seconds": 612, "passed": true},
+        "pronunciation": {"word_error_rate": 0.032, "passed": true},
+        "quality": {"mos_score": 4.23, "passed": true},
+        "prosody": {"pitch_std_hz": 45.2, "is_monotone": false, "passed": true},
+        "content": {"overall_score": 7.8, "passed": true},
+        "voice_matching": {"placeholder_detected": false, "passed": true}
+      }
+    }
+
+integration:
+  with_pipeline:
+    trigger: After audio generation completes
+    action: Run QA on generated audio
+    on_fail: Mark job as failed with QA issues
+  standalone:
+    use_case: Manual QA of audio files
+    batch_use: CSV processing for multiple files
+
+file_structure:
+  src/kitesforu_qa/:
+    cli.py: CLI entry point
+    config.py: Configuration management
+    pipeline.py: Pipeline orchestration
+    stages/:
+      format.py: Stage 1
+      pronunciation.py: Stage 2
+      quality.py: Stage 3
+      prosody.py: Stage 4
+      content.py: Stage 5
+      voice_matching.py: Stage 6
+    models/:
+      language.py: Language enum and config
+      results.py: QAResult and StageResult
+    integrations/:
+      gcs.py: Cloud Storage access
+      kitesforu_api.py: API client
+      llm.py: Gemini integration
+    utils/:
+      audio.py: Audio utilities
+      reporting.py: Report generation

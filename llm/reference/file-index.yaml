@@ -127,6 +127,33 @@ repositories:
       maintenance: scripts/maintenance/  # Maintenance scripts
       docs: docs/                        # Documentation
 
+  kitesforu-qa:
+    path: ${base_path}/kitesforu-qa
+    purpose: 6-stage Audio & Content Quality Assurance CLI
+    github: github.com/vikrantb/kitesforu-qa
+    key_files:
+      cli: src/kitesforu_qa/cli.py
+      pipeline: src/kitesforu_qa/pipeline.py
+      config: src/kitesforu_qa/config.py
+      dockerfile: docker/Dockerfile
+      pyproject: pyproject.toml
+      readme: README.md
+    directories:
+      src: src/kitesforu_qa/        # Main package
+      stages: src/kitesforu_qa/stages/   # 6 QA stages
+      models: src/kitesforu_qa/models/   # Data models
+      integrations: src/kitesforu_qa/integrations/  # GCS, API, LLM
+      utils: src/kitesforu_qa/utils/     # Utilities
+      tests: tests/                      # pytest tests
+      docker: docker/                    # Docker support
+    stage_files:
+      format: src/kitesforu_qa/stages/format.py
+      pronunciation: src/kitesforu_qa/stages/pronunciation.py
+      quality: src/kitesforu_qa/stages/quality.py
+      prosody: src/kitesforu_qa/stages/prosody.py
+      content: src/kitesforu_qa/stages/content.py
+      voice_matching: src/kitesforu_qa/stages/voice_matching.py
+
   kitetest:
     path: ${base_path}/kitetest
     purpose: E2E testing framework
