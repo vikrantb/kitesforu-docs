@@ -93,6 +93,96 @@ Or use the restart script if available:
 ./restart.sh
 ```
 
+---
+
+## API Test Suite
+
+**Location**: `/Users/vikrantbhosale/gitprojects/kitesforu/kitetest/apitests`
+
+The `kitetest` project includes a dedicated API test suite (21 tests) that validates API endpoints using the TEST_API_KEY authentication mechanism.
+
+### What It Tests
+
+| Test File | Coverage |
+|-----------|----------|
+| `auth.test.ts` | TEST_API_KEY authentication, 401 handling |
+| `health.test.ts` | Health check endpoint |
+| `credits.test.ts` | Credit balance, tier info |
+| `jobs.test.ts` | Job creation, status, listing |
+
+### Running API Tests
+
+```bash
+cd kitetest
+
+# Install dependencies
+npm install
+
+# Run all API tests
+npx playwright test --config=playwright.config.api.ts
+
+# Run specific test file
+npx playwright test apitests/auth.test.ts
+
+# Run with verbose output
+npx playwright test apitests/ --reporter=list
+```
+
+### Configuration
+
+API tests use TEST_API_KEY for authentication (no Clerk JWT needed):
+
+```typescript
+// apitests/config.ts
+export const config = {
+  apiUrl: process.env.API_URL || 'https://kitesforu-api-m6zqve5yda-uc.a.run.app',
+  testApiKey: process.env.TEST_API_KEY,  // Required
+  testUserId: process.env.TEST_USER_ID || 'test_user_e2e',
+};
+```
+
+### Environment Setup
+
+1. Get the TEST_API_KEY:
+```bash
+gcloud secrets versions access latest --secret=TEST_API_KEY --project=kitesforu-dev
+```
+
+2. Create `.env` in kitetest directory:
+```env
+TEST_API_KEY=<key from step 1>
+API_URL=https://kitesforu-api-m6zqve5yda-uc.a.run.app
+```
+
+### API Test Structure
+
+```
+kitetest/
+├── apitests/
+│   ├── config.ts           # API test configuration
+│   ├── api-client.ts       # Typed API client wrapper
+│   ├── auth.test.ts        # Authentication tests
+│   ├── health.test.ts      # Health check tests
+│   ├── credits.test.ts     # Credit system tests
+│   └── jobs.test.ts        # Job CRUD tests
+├── playwright.config.api.ts # API test config
+└── .env                    # TEST_API_KEY (not committed)
+```
+
+### Why API Tests vs E2E Tests?
+
+| API Tests | E2E Tests |
+|-----------|-----------|
+| Fast (~30 seconds) | Slow (5-10 minutes) |
+| Uses TEST_API_KEY | Uses Clerk auth |
+| Tests API directly | Tests full UI flow |
+| CI-friendly | Requires browser |
+| Validates contracts | Validates UX |
+
+Run API tests on every PR; run E2E tests for releases.
+
+---
+
 ## Repository Testing
 
 ### API (kitesforu-api)

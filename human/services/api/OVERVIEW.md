@@ -91,6 +91,16 @@ kitesforu-api/
 - `FRONTEND_URL`
 - `LOG_LEVEL`
 
+### Testing (E2E/Integration)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TEST_API_KEY` | Static API key for test authentication | None |
+| `ALLOW_TEST_API_KEY` | Enable TEST_API_KEY in cloud environments | `false` |
+| `TEST_USER_ID` | User ID returned for test auth | `test_user_e2e` |
+| `TEST_USER_EMAIL` | Email returned for test auth | `test@kitesforu.com` |
+
+See [Authentication](./AUTHENTICATION.md#test-api-key-authentication) for details.
+
 ### Cloud Run
 - `GCS_BUCKET`
 - `PUBSUB_TOPIC`
