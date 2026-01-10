@@ -124,7 +124,56 @@ await handler(job_id, user_id)
 - ElevenLabs (premium)
 
 ### Research APIs
-- Tavily (web search)
+- Tavily (web search) - Requires `tavily-python` dependency
+
+---
+
+## TTS Text Chunking
+
+Both OpenAI and Google Cloud TTS have input length limits. The TTS client automatically handles long scripts by chunking.
+
+### Provider Limits
+
+| Provider | Limit Type | Limit | Buffer |
+|----------|------------|-------|--------|
+| OpenAI | Characters | 4096 | 4000 |
+| Google Cloud | Bytes (UTF-8) | 5000 | 4500 |
+
+### Chunking Strategy
+
+The TTS client uses intelligent splitting to maintain natural speech flow:
+
+1. **Primary**: Split on sentence boundaries (`.`, `!`, `?`)
+2. **Secondary**: Split on clause boundaries (`,`, `;`)
+3. **Fallback**: Split on word boundaries
+
+```
+Long Script → Check Limit → [Over limit?] → Chunk Text
+                              │                    │
+                              │ [Under]            │
+                              ↓                    ↓
+                        Single TTS call    Chunk 1 → TTS → Audio 1
+                                          Chunk 2 → TTS → Audio 2
+                                          Chunk N → TTS → Audio N
+                                                         │
+                                                         ↓
+                                                   Concatenate MP3
+```
+
+### Example: Long Podcast Script
+
+```python
+# Script is 6000 characters → exceeds OpenAI's 4096 limit
+# TTS client automatically:
+# 1. Chunks into 2 parts (~3000 chars each)
+# 2. Generates audio for each chunk
+# 3. Concatenates MP3 bytes
+# Result: Seamless audio output
+```
+
+### Related
+
+- [Model Router](./MODEL_ROUTER.md) - Provider selection and fallback
 
 ## Deployment
 

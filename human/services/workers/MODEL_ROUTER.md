@@ -113,9 +113,55 @@ Premium (if allowed):
 - Update status in Firestore
 
 ### Circuit Breaker
-- Opens after 5 consecutive failures
-- Recovery attempt after 5 minutes
-- Gradual traffic increase on recovery
+
+The circuit breaker implements the half-open pattern for automatic recovery:
+
+#### States
+
+| State | Description | Behavior |
+|-------|-------------|----------|
+| **CLOSED** | Normal operation | All requests pass through |
+| **OPEN** | Provider unhealthy | Requests blocked, fallback used |
+| **HALF_OPEN** | Testing recovery | Limited probe requests allowed |
+
+#### State Transitions
+
+```
+CLOSED ─[5 failures]→ OPEN ─[1 hour timeout]→ HALF_OPEN ─[2 successes]→ CLOSED
+                                                   │
+                                                   └─[1 failure]→ OPEN
+```
+
+#### Configuration
+
+```python
+# In error_handler.py
+FAILURE_THRESHOLD = 5       # Consecutive failures before opening
+SUCCESS_THRESHOLD = 2       # Successes in half-open before closing
+TIMEOUT_SECONDS = 3600      # 1 hour before trying half-open
+```
+
+#### How It Works
+
+1. **Normal Operation (CLOSED)**
+   - All requests routed to provider
+   - Failures increment counter
+   - Successes reset counter
+
+2. **Circuit Opens (OPEN)**
+   - After 5 consecutive failures
+   - All requests use fallback provider
+   - Timer starts for recovery
+
+3. **Recovery Probing (HALF_OPEN)**
+   - After 1 hour timeout
+   - Limited requests sent as probes
+   - Success count tracked
+
+4. **Recovery Complete (CLOSED)**
+   - After 2 successful probes
+   - Normal operation resumes
+   - Provider fully restored
 
 ### Firestore Collection
 ```
@@ -126,6 +172,16 @@ model_provider_health/{provider}
   "last_check": "2024-01-15T10:30:00Z",
   "latency_ms": 250,
   "error_rate": 0.01
+}
+
+circuit_breakers/{provider}
+{
+  "provider": "openai",
+  "state": "closed",  // closed, open, half_open
+  "opened_at": null,
+  "half_opened_at": null,
+  "failure_count": 0,
+  "success_count": 0
 }
 ```
 

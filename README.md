@@ -2,7 +2,7 @@
 
 **Living documentation for the KitesForU podcast generation platform.**
 
-Last Updated: 2026-01-03
+Last Updated: 2026-01-07
 
 ---
 

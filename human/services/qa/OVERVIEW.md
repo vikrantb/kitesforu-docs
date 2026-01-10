@@ -227,6 +227,110 @@ The QA system can be integrated into the KitesForU pipeline:
 3. **Batch validation**: QA all jobs in a CSV
 4. **E2E testing**: Full API → QA flow
 
+---
+
+## Improvement Feedback System
+
+When QA fails, the system generates **actionable feedback** targeting specific system components—not the user's request.
+
+### Philosophy
+
+```
+User Request: FIXED (never changed)
+System Components: MODIFIABLE
+
+QA Fails → Analyze failure → Generate feedback → Target internal components
+```
+
+### Target Components
+
+| Component | File | What Gets Modified |
+|-----------|------|-------------------|
+| Prompt Templates | `kitesforu-workers/src/workers/prompting/templates.py` | Script generation prompts |
+| TTS Client | `kitesforu-workers/src/workers/stages/audio/tts_client.py` | Voice settings, chunking |
+| Voice Casting | Audio worker config | Voice selection, persona matching |
+| LLM Routing | Model router | Model selection for script gen |
+
+### Feedback Structure
+
+```json
+{
+  "priority": "high",
+  "summary": "Script lacks proper structure",
+  "suggestions": [
+    {
+      "type": "prompt_template",
+      "target": "script_generation",
+      "issue": "low_structure_score",
+      "modification": "add_to_prompt",
+      "lines": [
+        "REQUIRED STRUCTURE:",
+        "1. HOOK (30-60 sec)",
+        "2. INTRODUCTION",
+        "3. BODY - 3-5 sections",
+        "4. CONCLUSION"
+      ]
+    }
+  ],
+  "improvement_prompt": "LLM-consumable prompt for regeneration..."
+}
+```
+
+### Issue-to-Improvement Mapping
+
+| QA Issue | Target | Suggested Fix |
+|----------|--------|---------------|
+| Low topic score | Script prompt | Add topic adherence rules |
+| Low structure score | Script prompt | Add structure requirements |
+| Low engagement | Script prompt | Add engagement techniques |
+| Low speakability | Script prompt | Add sentence length rules |
+| Robotic prosody | TTS settings | Adjust pitch/rate parameters |
+| Voice mismatch | Voice casting | Update voice selection |
+| Long sentences | Script prompt | Enforce word limits |
+
+### Using Feedback
+
+```python
+# Get QA results
+results = qa_pipeline.run(audio_path, request, script)
+
+# If failed, get improvement recommendations
+if not results.passed:
+    feedback = results.get_improvement_feedback()
+
+    print(f"Priority: {feedback['priority']}")
+    print(f"Summary: {feedback['summary']}")
+
+    for suggestion in feedback['suggestions']:
+        print(f"  - {suggestion['issue']}: {suggestion['modification']}")
+
+    # LLM-consumable prompt for automated fixes
+    llm_prompt = feedback['improvement_prompt']
+```
+
+### CLI Output
+
+When QA fails, `kqa run --verbose` outputs:
+
+```
+============================================================
+🔧 IMPROVEMENT RECOMMENDATIONS
+============================================================
+Priority: HIGH
+Summary: Script lacks proper structure (intro/body/conclusion)
+
+Suggested Actions:
+🟠 [high] prompt_template: Add structure requirements to script_generation
+🟡 [medium] prompt_template: Add engagement techniques
+
+Full Improvement Prompt (for LLM consumption):
+----------------------------------------
+Based on QA analysis, modify the script_generation template in
+kitesforu-workers/src/workers/prompting/templates.py to include...
+----------------------------------------
+============================================================
+```
+
 ## Architecture
 
 ```
