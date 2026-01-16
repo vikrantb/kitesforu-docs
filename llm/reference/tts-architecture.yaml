@@ -1,0 +1,324 @@
+# file: llm/reference/tts-architecture.yaml
+# purpose: TTS (Text-to-Speech) system architecture and voice configuration
+# updated: 2026-01-15
+# source: kitesforu-workers/config/tts_voices.yaml
+
+overview:
+  description: |
+    The TTS system provides multi-provider text-to-speech with intelligent
+    routing based on language and user tier. Configuration is centralized
+    in a single YAML file - no code changes needed to add voices.
+
+  key_principles:
+    - Language-first: Native voices sound best for each language
+    - Tier-aware: Premium users get premium voices when available
+    - Config-driven: All voices defined in YAML, not code
+    - Fallback-safe: Graceful degradation if preferred provider unavailable
+
+# =============================================================================
+# PROVIDERS
+# =============================================================================
+# Three TTS providers, each with different strengths
+
+providers:
+  openai:
+    description: Best for English, fast, consistent quality
+    api_url: "https://api.openai.com/v1/audio/speech"
+    max_chars: 4000
+    models:
+      standard: "tts-1"      # Fast, good quality
+      hd: "tts-1-hd"         # Higher quality, slower
+    voices:
+      - alloy               # Neutral, versatile
+      - echo                # Male, warm
+      - fable               # British, storytelling
+      - onyx                # Male, deep
+      - nova                # Female, friendly
+      - shimmer             # Female, soft
+    pricing_per_million_chars:
+      tts-1: $15
+      tts-1-hd: $30
+    best_for:
+      - English content
+      - Fast generation
+      - Consistent results
+
+  google:
+    description: Native voices for 40+ languages, excellent pronunciation
+    api: Google Cloud Text-to-Speech
+    max_bytes: 5000
+    voice_types:
+      standard: Basic quality
+      wavenet: Higher quality
+      neural2: Best quality (recommended)
+    supported_languages: 40+
+    pricing_per_million_chars:
+      neural2: $16
+      standard: $4
+      wavenet: $16
+    best_for:
+      - Non-English languages
+      - Native pronunciation
+      - Regional accents
+
+  elevenlabs:
+    description: Premium quality, expressive, supports emotions
+    api_url: "https://api.elevenlabs.io/v1/text-to-speech"
+    max_chars: 5000
+    models:
+      flash: "eleven_flash_v2_5"           # Fast, good quality
+      multilingual: "eleven_multilingual_v2"  # Best for non-English
+      turbo: "eleven_turbo_v2_5"           # Balanced
+    features:
+      - Emotion control (stability, style)
+      - Voice cloning
+      - Multi-language support
+    pricing_per_million_chars:
+      eleven_flash_v2_5: $150
+      eleven_multilingual_v2: $300
+      eleven_turbo_v2_5: $150
+    best_for:
+      - Premium tier users
+      - Expressive content
+      - Emotional delivery
+
+# =============================================================================
+# PROVIDER SELECTION LOGIC
+# =============================================================================
+# How the system chooses which provider to use
+
+provider_selection:
+  description: |
+    Provider is chosen based on two factors:
+    1. User tier (subscription level)
+    2. Language (native vs optimized)
+
+  tier_to_model_mapping:
+    trial: "tts-1"                      # OpenAI standard
+    enthusiast: "tts-1"                 # OpenAI standard
+    pro_creator: "eleven_flash_v2_5"    # ElevenLabs flash
+    ultimate_creator: "eleven_multilingual_v2"  # ElevenLabs premium
+
+  language_routing:
+    english:
+      # English → OpenAI (optimized for English)
+      languages: ["en-US", "en-GB", "en-AU", "en-IN"]
+      default_provider: openai
+      reason: "OpenAI voices are optimized for English pronunciation"
+
+    native_google:
+      # Non-English → Google (native voices)
+      languages:
+        - "hi-IN"   # Hindi
+        - "es-ES"   # Spanish (Spain)
+        - "es-MX"   # Spanish (Mexico)
+        - "fr-FR"   # French
+        - "de-DE"   # German
+        - "it-IT"   # Italian
+        - "pt-BR"   # Portuguese (Brazil)
+        - "ja-JP"   # Japanese
+        - "ko-KR"   # Korean
+        - "zh-CN"   # Chinese (Mandarin)
+        - "ar-XA"   # Arabic
+        - "ru-RU"   # Russian
+        - "nl-NL"   # Dutch
+        - "pl-PL"   # Polish
+        - "tr-TR"   # Turkish
+        - "vi-VN"   # Vietnamese
+        - "th-TH"   # Thai
+        - "id-ID"   # Indonesian
+        - "ta-IN"   # Tamil
+        - "te-IN"   # Telugu
+        - "bn-IN"   # Bengali
+        - "mr-IN"   # Marathi
+      default_provider: google
+      reason: "Google has native speaker voices for each language"
+
+  selection_algorithm: |
+    def select_provider(language, user_tier):
+        tier_provider = get_tier_provider(user_tier)  # e.g., "elevenlabs"
+        native_provider = get_native_provider(language)  # e.g., "google"
+
+        # Premium tier + ElevenLabs has voice for this language?
+        if tier_provider == "elevenlabs" and has_voice(language, "elevenlabs"):
+            return "elevenlabs"  # Use premium voice
+
+        # Otherwise use native provider
+        return native_provider
+
+# =============================================================================
+# VOICE DEFINITIONS
+# =============================================================================
+# Complete voice catalog organized by language
+
+voice_catalog:
+  how_to_find_voice_provider: |
+    Each voice is defined under: voices.{language}.{provider}
+
+    Example: "What provider is Priya?"
+    → Look up: voices.hi-IN.google
+    → Found: voice_id "hi-IN-Neural2-D", name "Priya"
+    → Answer: Priya is a Google Cloud TTS Neural2 voice
+
+  sample_voices:
+    hindi:
+      language: hi-IN
+      google:
+        - {voice_id: "hi-IN-Neural2-B", name: "Arjun", gender: "MALE"}
+        - {voice_id: "hi-IN-Neural2-A", name: "Ananya", gender: "FEMALE"}
+        - {voice_id: "hi-IN-Neural2-C", name: "Vikram", gender: "MALE"}
+        - {voice_id: "hi-IN-Neural2-D", name: "Priya", gender: "FEMALE"}
+      elevenlabs:
+        - {voice_id: "bVMeCyTHy58xNoL34h3p", name: "Rahul", gender: "MALE"}
+        - {voice_id: "jsCqWAovK2LkecY7zXl4", name: "Sneha", gender: "FEMALE"}
+
+    english_us:
+      language: en-US
+      openai:
+        - {voice_id: "alloy", name: "Alloy", gender: "NEUTRAL"}
+        - {voice_id: "echo", name: "Echo", gender: "MALE"}
+        - {voice_id: "nova", name: "Nova", gender: "FEMALE"}
+        - {voice_id: "shimmer", name: "Shimmer", gender: "FEMALE"}
+      google:
+        - {voice_id: "en-US-Neural2-D", name: "Matthew", gender: "MALE"}
+        - {voice_id: "en-US-Neural2-C", name: "Sarah", gender: "FEMALE"}
+      elevenlabs:
+        - {voice_id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel", gender: "FEMALE"}
+        - {voice_id: "pNInz6obpgDQGcFmaJgB", name: "Adam", gender: "MALE"}
+
+# =============================================================================
+# CONFIGURATION FILE
+# =============================================================================
+# Single source of truth for all TTS configuration
+
+config_file:
+  location: "kitesforu-workers/config/tts_voices.yaml"
+
+  structure:
+    providers: API settings, limits, pricing for each provider
+    tier_models: Subscription tier → default model mapping
+    language_routing: Language → preferred provider mapping
+    voices: Language → provider → voice list
+
+  how_to_add_voice: |
+    1. Open config/tts_voices.yaml
+    2. Find the language section (or create new one)
+    3. Add voice under the provider section:
+
+       voices:
+         new-LANG:
+           google:
+             - voice_id: "new-LANG-Neural2-A"
+               name: "VoiceName"
+               gender: "MALE"
+
+    4. No code changes needed - config is loaded automatically
+
+  how_to_add_language: |
+    1. Add language to language_routing (english or native_google)
+    2. Add voice definitions under voices section
+    3. Optionally add short-code mapping in voice_selector.py
+
+# =============================================================================
+# AUDIO GENERATION FLOW
+# =============================================================================
+
+generation_flow:
+  steps:
+    1_voice_selection:
+      component: VoiceSelector
+      file: voice_selector.py
+      input: [speaker, language, user_tier, gender_preference]
+      output: VoiceSelection(provider, voice_id, voice_name, gender, is_native)
+
+    2_provider_routing:
+      component: TTSClient._generate_single_segment()
+      file: tts_client.py
+      input: [text, VoiceSelection]
+      routes:
+        ELEVENLABS: _generate_elevenlabs()
+        GOOGLE_NEURAL: _generate_gcp()
+        OPENAI: _generate_openai()
+
+    3_audio_generation:
+      process: Provider-specific API call
+      features:
+        - Text chunking for length limits
+        - Parallel processing for dialogue
+        - Automatic fallback on errors
+
+  example_flow:
+    scenario: "Generate Hindi podcast for free tier user"
+    steps:
+      - VoiceSelector receives (speaker="Host1", language="hi-IN", tier="free")
+      - tier_provider = "openai" (from tier_models.trial)
+      - native_provider = "google" (from language_routing.native_google)
+      - elevenlabs has Hindi voices, but tier is free → use native_provider
+      - Returns VoiceSelection(provider=GOOGLE_NEURAL, voice_id="hi-IN-Neural2-B")
+      - TTSClient routes to _generate_gcp() with voice_id and language
+
+# =============================================================================
+# EMOTION RENDERING (PLANNED)
+# =============================================================================
+
+emotion_support:
+  status: Planned
+
+  current_state:
+    - ElevenLabs: voice_settings (stability, style) supported
+    - Google: Basic prosody via SSML possible but not implemented
+    - OpenAI: No direct emotion control
+
+  planned_architecture:
+    script_generation:
+      description: LLM generates emotion metadata per dialogue line
+      output:
+        text: "Welcome to our show!"
+        emotion: "warm"
+        intensity: 0.7
+        rate: 1.0
+
+    provider_adapters:
+      elevenlabs:
+        method: voice_settings (stability, style)
+        emotion_mapping:
+          excited: {stability: 0.25, style: 0.8}
+          warm: {stability: 0.50, style: 0.5}
+          thoughtful: {stability: 0.60, style: 0.35}
+
+      google:
+        method: SSML prosody tags
+        example: '<prosody rate="110%" pitch="+2st">Exciting news!</prosody>'
+
+      openai:
+        method: Limited (prompt engineering)
+        note: "OpenAI TTS has minimal emotion control"
+
+# =============================================================================
+# QUICK REFERENCE
+# =============================================================================
+
+quick_reference:
+  "Which provider for Hindi?": |
+    Free tier: Google (native voice)
+    Pro/Ultimate tier: ElevenLabs (if Hindi voice exists) else Google
+
+  "What is voice 'Priya'?": |
+    Provider: Google Cloud TTS
+    Voice ID: hi-IN-Neural2-D
+    Language: Hindi (hi-IN)
+    Gender: FEMALE
+
+  "How to add a new voice?": |
+    Edit config/tts_voices.yaml, add voice under voices.{lang}.{provider}
+    No code changes needed.
+
+  "Why does Hindi use Google not OpenAI?": |
+    OpenAI voices are English-native, they pronounce Hindi with an
+    English accent. Google has native Hindi speakers for authentic sound.
+
+files:
+  config: kitesforu-workers/config/tts_voices.yaml
+  voice_selector: kitesforu-workers/src/workers/stages/audio/voice_selector.py
+  tts_client: kitesforu-workers/src/workers/stages/audio/tts_client.py
+  tests: kitesforu-workers/tests/test_voice_selector.py

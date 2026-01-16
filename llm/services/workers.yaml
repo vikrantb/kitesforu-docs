@@ -130,20 +130,35 @@ llm_usage:
     prompt_type: creative_dialogue
 
 tts_usage:
-  standard:
-    provider: openai
-    model: tts-1
-    voices: [alloy, echo, fable, onyx, nova, shimmer]
+  # See llm/reference/tts-architecture.yaml for complete TTS documentation
+  config_file: kitesforu-workers/config/tts_voices.yaml
 
-  hd:
-    provider: openai
-    model: tts-1-hd
-    voices: [alloy, echo, fable, onyx, nova, shimmer]
+  providers:
+    openai:
+      models: [tts-1, tts-1-hd]
+      best_for: English
+      voices: [alloy, echo, fable, onyx, nova, shimmer]
 
-  premium:
-    provider: elevenlabs
-    model: eleven_multilingual_v2
-    requires: allow_premium=true
+    google:
+      types: [neural2, wavenet, standard]
+      best_for: Non-English languages (native voices)
+      supported_languages: 40+
+
+    elevenlabs:
+      models: [eleven_flash_v2_5, eleven_multilingual_v2, eleven_turbo_v2_5]
+      best_for: Premium tier, expressive content
+      features: [emotion_control, voice_cloning]
+
+  tier_routing:
+    trial: openai (tts-1)
+    enthusiast: openai (tts-1)
+    pro_creator: elevenlabs (eleven_flash_v2_5)
+    ultimate_creator: elevenlabs (eleven_multilingual_v2)
+
+  language_routing:
+    english: openai (optimized)
+    non_english: google (native voices)
+    premium_override: elevenlabs (if voice available)
 
 external_apis:
   tavily:
