@@ -1,0 +1,84 @@
+# Debug Page Reference
+# URL: /debug/[jobId]
+
+overview: |
+  Internal debugging interface for analyzing podcast generation jobs.
+  Provides visibility into worker execution, LLM calls, tool usage, and costs.
+
+url_pattern: "/debug/{job_id}"
+
+authentication: required
+
+sections:
+  job_header:
+    fields:
+      - status: "processing | completed | failed"
+      - language: "Job language code"
+      - duration_min: "Target podcast duration"
+      - total_cost: "Cumulative cost in USD"
+      - topic: "User-provided topic"
+
+  execution_timeline:
+    description: "Chronological list of all operations"
+    event_types:
+      - stage_input: "What triggered each worker stage"
+      - llm_call: "Model invocations with prompts/responses"
+      - tool_call: "External tool executions (search, etc.)"
+      - tts_call: "Text-to-speech synthesis calls"
+    features:
+      - filter_by_type: true
+      - search: true
+      - expandable_details: true
+
+  research_flow:
+    description: "Research tasks and their results"
+    fields:
+      - task_id: "Unique task identifier"
+      - query: "Search query"
+      - rationale: "Why this research was needed"
+      - results: "Array of search results with URLs"
+      - status: "success | failed"
+
+  stages_accordion:
+    description: "Per-stage detailed breakdown"
+    stages:
+      - initiate
+      - research_planner
+      - execute_tools
+      - script
+      - audio
+
+  outputs:
+    description: "Final job outputs"
+    fields:
+      - audio_url: "GCS URL to generated audio"
+      - script: "Full podcast script"
+      - outline: "Structured outline JSON"
+
+keyboard_shortcuts:
+  e: "Expand all stages"
+  c: "Collapse all stages"
+  r: "Refresh data"
+
+api_endpoint:
+  path: "/api/jobs/{job_id}/debug"
+  method: GET
+  auth: "Bearer token required"
+
+data_sources:
+  firestore_collections:
+    - "podcast_jobs": "Main job document"
+    - "podcast_jobs/{id}/debug_logs": "Execution timeline"
+    - "podcast_jobs/{id}/llm_calls": "LLM call details"
+    - "podcast_jobs/{id}/tool_calls": "Tool execution logs"
+
+frontend_components:
+  - "app/debug/[jobId]/page.tsx": "Main debug page"
+  - "components/debug/ExecutionTimeline.tsx": "Timeline component"
+  - "components/debug/ResearchFlow.tsx": "Research visualization"
+
+use_cases:
+  - "Investigating failed jobs"
+  - "Analyzing content quality"
+  - "Cost optimization"
+  - "Performance debugging"

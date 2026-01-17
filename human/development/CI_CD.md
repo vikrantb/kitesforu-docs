@@ -6,6 +6,26 @@
 
 KitesForU uses GitHub Actions for CI/CD, with Cloud Build for Docker image builds and Cloud Run for deployments.
 
+## Critical: Frontend Deployment Caveats
+
+**Next.js `NEXT_PUBLIC_*` variables are inlined at BUILD TIME, not runtime.**
+
+The frontend CI/CD pipeline correctly handles this by:
+1. Building Docker image with `--build-arg NEXT_PUBLIC_*=...`
+2. Pushing to Artifact Registry
+3. Updating Cloud Run service with `gcloud run services update --image`
+
+**NEVER use `gcloud run deploy --source` for the frontend.** This will break authentication because `--set-build-env-vars` sets environment variables, not Docker build arguments.
+
+See [deploy-frontend.md](../operations/runbooks/deploy-frontend.md) for the correct manual deployment procedure.
+
+## Current Environment
+
+**Note**: All workflows currently deploy to `kitesforu-dev` only. Production deployment requires:
+1. Separate GitHub Secrets for prod (GCP keys, Clerk keys)
+2. Workflow modifications or separate prod workflows
+3. Different Artifact Registry or image tagging strategy
+
 ## Pipeline Architecture
 
 ```

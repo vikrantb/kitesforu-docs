@@ -6,6 +6,54 @@
 
 Deploy the Next.js frontend to Cloud Run.
 
+## CRITICAL: Build-Time Environment Variables
+
+**Next.js `NEXT_PUBLIC_*` variables are embedded at BUILD TIME, not runtime.**
+
+### DO NOT use `gcloud run deploy --source`
+
+```bash
+# WRONG - This will break authentication!
+gcloud run deploy kitesforu-frontend --source . \
+  --set-build-env-vars "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_xxx"
+
+# This sets ENV vars during Cloud Build, NOT Docker ARGs.
+# The Dockerfile expects --build-arg, not ENV vars.
+```
+
+### Correct Deployment Method
+
+Use the CI/CD pipeline (push to main) or manual Docker build:
+
+```bash
+# CORRECT - Manual deployment with proper build args
+docker build \
+  --build-arg NEXT_PUBLIC_API_BASE=https://kitesforu-api-xxx.run.app \
+  --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_xxx \
+  -t us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/kitesforu-frontend:latest .
+
+docker push us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/kitesforu-frontend:latest
+
+gcloud run services update kitesforu-frontend \
+  --image us-central1-docker.pkg.dev/kitesforu-dev/kitesforu-docker/kitesforu-frontend:latest \
+  --region us-central1
+```
+
+### Symptoms of Wrong Deployment
+
+If you see this error after deployment:
+```
+Error: @clerk/nextjs: Missing publishableKey
+```
+
+**Immediate action**: Rollback to previous revision
+```bash
+gcloud run revisions list --service=kitesforu-frontend --region=us-central1 --limit=5
+gcloud run services update-traffic kitesforu-frontend \
+  --region=us-central1 \
+  --to-revisions=<previous-working-revision>=100
+```
+
 ## Prerequisites
 
 - [ ] GCP access configured
