@@ -59,6 +59,8 @@ gcloud logging read "jsonPayload.job_id=\"JOB_ID\"" --limit=50
 
 #### Job Failed with Error
 
+**Quick Debug**: Use the debug page at `/debug/<job-id>` to see the full execution timeline, LLM calls, research results, and errors in a single view.
+
 **Diagnosis**:
 ```bash
 # Get error details from job

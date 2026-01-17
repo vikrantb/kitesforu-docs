@@ -6,6 +6,14 @@
 
 Deploy the Next.js frontend to Cloud Run.
 
+## ⚠️ Critical: Build-Time Variables
+
+**Next.js `NEXT_PUBLIC_*` variables are inlined at BUILD TIME, not runtime.**
+
+Do NOT use `gcloud run deploy --source` with `--set-build-env-vars` - this sets ENV vars, not Docker ARGs, and will break authentication. Always use the deploy script or build Docker image with `--build-arg`.
+
+If you see `Error: @clerk/nextjs: Missing publishableKey` after deployment, immediately rollback to previous revision.
+
 ## Prerequisites
 
 - [ ] GCP access configured
