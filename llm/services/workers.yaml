@@ -13,6 +13,12 @@ service:
 repository:
   path: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-workers
   structure:
+    src/planner/:
+      __init__.py: Module exports
+      agentic_planner.py: Main orchestrator for persisted agentic research
+      state_machine.py: Research session state transitions
+      session.py: Firestore persistence for research sessions
+      parallel_executor.py: Parallel tool execution with retry/timeout
     src/workers/:
       main.py: FastAPI app with stage routing
       handlers/:
@@ -35,6 +41,10 @@ repository:
         clarifier.py: Clarifier question prompts
         research_planner.py: Research plan prompts
         script_generator.py: Script generation prompts
+      stages/tools/execution/:
+        base.py: Base executor classes
+        direct_executor.py: Direct parallel execution (trial/enthusiast)
+        persisted_agentic_executor.py: Persisted agentic execution (pro/ultimate)
 
 cloud_run_services:
   - name: kitesforu-worker-initiator
@@ -123,6 +133,16 @@ llm_usage:
     primary: openai/gpt-4o-mini
     purpose: Generate research plan
     prompt_type: structured_json
+
+  agentic_research:
+    # See llm/reference/planner-architecture.yaml for complete documentation
+    primary: openai/gpt-4o
+    purpose: LLM-driven tool selection and synthesis for pro/ultimate tiers
+    prompt_type: tool_calling
+    phases:
+      planning: Decides what tools to call based on topic/outline
+      synthesis: Processes results, may iterate for more research
+    tier_support: [pro_creator, ultimate_creator]
 
   script_generator:
     primary: openai/gpt-4o

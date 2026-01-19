@@ -148,6 +148,45 @@ collections:
     indexes:
       - fields: [job_id, timestamp DESC]
 
+  research_sessions:
+    purpose: Persisted agentic research session state (pro/ultimate tiers)
+    document_id: session_id (rs_{uuid})
+    fields:
+      session_id: string
+      job_id: string
+      status: ResearchSessionStatus enum (planning|executing|synthesizing|complete|failed|paused)
+      iteration: int (0-5)
+      budget_limit: float
+      budget_spent: float
+      llm_plan: map (reasoning, tool_count, iteration)
+      tool_calls: list[ToolCallPlan]
+      tool_results: map[string, ToolCallResult]
+      findings: list[map]
+      synthesis: string
+      errors: list[string]
+      warnings: list[string]
+      created_at: timestamp
+      updated_at: timestamp
+      completed_at: timestamp (optional)
+    indexes:
+      - fields: [job_id, created_at DESC]
+      - fields: [status, created_at DESC]
+    subcollections: none
+
+  job_debug_logs:
+    purpose: Debug/trace logs for content quality investigation
+    document_id: log_id (auto-generated)
+    fields:
+      job_id: string
+      timestamp: timestamp
+      log_type: string (stage_input|llm_call|tool_call)
+      stage: string
+      worker_class: string (optional)
+      data: map (varies by log_type)
+    indexes:
+      - fields: [job_id, timestamp DESC]
+      - fields: [job_id, log_type, timestamp DESC]
+
 ttl_policies:
   routing_decisions:
     field: timestamp
@@ -156,3 +195,10 @@ ttl_policies:
     field: created_at
     duration: 90 days
     condition: acknowledged == true
+  research_sessions:
+    field: updated_at
+    duration: 7 days
+    condition: status in [complete, failed]
+  job_debug_logs:
+    field: timestamp
+    duration: 14 days

@@ -1,0 +1,250 @@
+# file: llm/reference/planner-architecture.yaml
+# purpose: Persisted Agentic Research Planner architecture documentation
+# updated: 2026-01-18
+# source: /Users/vikrantbhosale/gitprojects/kitesforu/kitesforu-workers/src/planner/
+
+overview:
+  name: Persisted Agentic Research Planner
+  purpose: LLM-driven research with state persistence for resumability
+  location: src/planner/
+  tier_support: pro_creator, ultimate_creator
+  key_features:
+    - LLM-driven tool selection (not hardcoded)
+    - Parallel tool execution with error isolation
+    - Firestore state persistence for crash recovery
+    - Multi-iteration research with synthesis
+    - Budget tracking and enforcement
+    - Comprehensive observability/logging
+
+architecture:
+  components:
+    agentic_planner.py:
+      purpose: Main orchestrator for persisted agentic research
+      responsibilities:
+        - Build context for LLM calls
+        - Manage LLM planning phase
+        - Manage LLM synthesis phase
+        - Coordinate with state machine
+      key_methods:
+        - research(): Main entry point
+        - _llm_plan(): Get tool calls from LLM
+        - _llm_synthesize(): Synthesize results
+        - _build_planning_prompt(): Construct planning prompt
+        - _build_synthesis_prompt(): Construct synthesis prompt
+
+    state_machine.py:
+      purpose: Manage phase transitions for research sessions
+      states:
+        PLANNING: LLM decides what tools to call
+        EXECUTING: Tools run in parallel with error isolation
+        SYNTHESIZING: LLM processes results (may loop to PLANNING)
+        COMPLETE: Research finished successfully
+        FAILED: Unrecoverable error occurred
+        PAUSED: Awaiting external intervention
+      transitions:
+        - "PLANNING -> EXECUTING (after LLM provides tool calls)"
+        - "EXECUTING -> SYNTHESIZING (after all tools complete)"
+        - "SYNTHESIZING -> PLANNING (if more research needed)"
+        - "SYNTHESIZING -> COMPLETE (if research sufficient)"
+        - "Any -> FAILED (on unrecoverable error)"
+      limits:
+        max_iterations: 5
+        min_budget_for_iteration: 0.10
+
+    parallel_executor.py:
+      purpose: Execute tool calls in parallel with robust error handling
+      features:
+        concurrency_control:
+          method: asyncio.Semaphore
+          default_max_concurrent: 5
+        error_isolation:
+          description: One tool failure doesn't affect others
+          implementation: Each tool wrapped in try/except
+        retry_mechanism:
+          max_retries: 3
+          strategy: Exponential backoff
+          base_delay: 1.0s
+          max_delay: 10.0s
+        timeout:
+          per_tool: 30s
+          implementation: asyncio.wait_for
+        budget_tracking:
+          method: asyncio.Lock for thread-safety
+          enforcement: Skip tools if budget exhausted
+        incremental_persistence:
+          description: Results saved as each tool completes
+          callback: on_result function
+
+    session.py:
+      purpose: Firestore persistence for research sessions
+      collection: research_sessions
+      operations:
+        - create_session(): Initialize new session
+        - load_session(): Load by session_id
+        - load_session_for_job(): Load most recent for job
+        - save_session(): Full state save
+        - update_status(): Atomic status transition
+        - save_llm_plan(): Save plan before execution
+        - update_tool_result(): Incremental result save
+        - save_synthesis(): Save final findings
+        - mark_failed(): Mark session as failed
+        - get_incomplete_sessions(): Find resumable sessions
+      schema:
+        session_id: string (rs_{uuid})
+        job_id: string
+        status: enum (planning|executing|synthesizing|complete|failed|paused)
+        iteration: int
+        budget_limit: float
+        budget_spent: float
+        llm_plan: dict
+        tool_calls: List[ToolCallPlan]
+        tool_results: Dict[str, ToolCallResult]
+        findings: List[dict]
+        synthesis: string
+        errors: List[string]
+        warnings: List[string]
+        created_at: timestamp
+        updated_at: timestamp
+        completed_at: timestamp
+
+execution_flow:
+  description: Three-phase iterative research
+  diagram: |
+    ┌──────────────────────────────────────────────────────────────┐
+    │ Phase 1: LLM Planning                                         │
+    │ - LLM analyzes topic and decides tool calls                  │
+    │ - Plan SAVED to Firestore before any execution               │
+    │ - User can VIEW/EDIT the plan via API                        │
+    └────────────────────────┬─────────────────────────────────────┘
+                             │
+                             ▼
+    ┌──────────────────────────────────────────────────────────────┐
+    │ Phase 2: Parallel Tool Execution                             │
+    │ - All tools run in parallel (semaphore: max 5 concurrent)    │
+    │ - Each tool: timeout (30s) + retry (3x) + error isolation    │
+    │ - Failed tool → marked failed, others continue               │
+    │ - Results saved incrementally to Firestore                   │
+    └────────────────────────┬─────────────────────────────────────┘
+                             │
+                             ▼
+    ┌──────────────────────────────────────────────────────────────┐
+    │ Phase 3: LLM Synthesis                                       │
+    │ - LLM sees successful results + failed tool info             │
+    │ - May request more tools → go back to Phase 1                │
+    │ - Or synthesizes final research findings                     │
+    └──────────────────────────────────────────────────────────────┘
+
+integration:
+  executor_factory:
+    location: src/workers/stages/tools/execution/__init__.py
+    tier_routing:
+      trial: DirectToolExecutor
+      enthusiast: DirectToolExecutor
+      pro_creator: PersistedAgenticExecutor
+      ultimate_creator: PersistedAgenticExecutor
+    persisted_agentic_executor:
+      location: src/workers/stages/tools/execution/persisted_agentic_executor.py
+      purpose: Wrapper that uses AgenticPlanner for pro/ultimate tiers
+      key_difference: Does its own planning (ignores pre-planned tasks)
+
+  tools_worker:
+    location: src/workers/stages/tools/worker.py
+    changes:
+      - Passes use_persisted_agentic=True to ExecutorFactory
+      - Includes topic and outline in context for planner
+      - Logs execution mode for observability
+
+observability:
+  logging_integration:
+    stage_input:
+      function: log_stage_input
+      stage: persisted_agentic_research
+      fields: [topic, outline_title, budget_limit, research_tasks_count]
+    llm_calls:
+      function: log_llm_call
+      stages: [agentic_planning, agentic_synthesis]
+      fields: [prompt, model, temperature, tokens, cost, response]
+    tool_calls:
+      function: log_tool_call
+      stage: agentic_parallel_execution
+      fields: [tool_name, query, parameters, results, success, error, duration_ms, cost]
+
+  firestore_collection: job_debug_logs
+  replay_capability: true
+  purpose: Debug content quality issues by tracing full execution
+
+error_handling:
+  graceful_imports:
+    description: Optional dependencies wrapped in try/except
+    affected_modules:
+      - workers.prompts.load_prompt
+      - workers.common.debug_logging.log_llm_call
+      - workers.common.debug_logging.log_tool_call
+    pattern: |
+      try:
+          from module import function
+          _AVAILABLE = True
+      except ImportError:
+          _AVAILABLE = False
+          function = None
+
+  timestamp_handling:
+    location: session.py._dict_to_session
+    issue: Firestore returns various datetime types
+    solution: Robust conversion handling both naive and timezone-aware datetimes
+
+  budget_race_condition:
+    location: parallel_executor.py.execute_all
+    issue: Multiple concurrent tasks reading/writing budget
+    solution: asyncio.Lock for atomic budget checks and updates
+
+schemas:
+  location: src/shared/schemas.py
+  new_models:
+    ResearchSession:
+      description: Complete research session state
+      persistence: Firestore collection research_sessions
+    ResearchSessionStatus:
+      type: enum
+      values: [planning, executing, synthesizing, complete, failed, paused]
+    ToolCallPlan:
+      description: Planned tool call with status
+      fields: [id, tool, args, status, rationale]
+    ToolCallResult:
+      description: Result of tool execution
+      fields: [tool_call_id, status, result, error, duration_ms, retries, cost]
+    ToolCallStatus:
+      type: enum
+      values: [pending, running, success, failed, skipped]
+
+configuration:
+  executor_config:
+    max_concurrent: 5
+    max_retries: 3
+    timeout_seconds: 30
+    retry_base_delay: 1.0
+    retry_max_delay: 10.0
+
+  state_machine_limits:
+    max_iterations: 5
+    min_budget_for_next_iteration: 0.10
+
+  budget_allocation:
+    tools_stage_percentage: 30%
+
+testing:
+  unit_tests:
+    - parallel_executor with mock tools (success, failure, timeout, retry)
+    - state_machine phase transitions
+    - session persistence (save, load, incremental update)
+  integration_tests:
+    - Full flow: Topic -> Planning -> Execution -> Synthesis
+    - Resumability: Simulate crash during execution, verify resume
+    - Error isolation: One tool fails, others complete
+    - Multi-iteration: LLM requests additional tools
+
+rollback_plan:
+  feature_flag: ENABLE_AGENTIC_RESEARCH
+  default: true
+  fallback: Existing two-phase flow (DirectToolExecutor)
+  scope: Pro/ultimate tiers only, trial/enthusiast unaffected
