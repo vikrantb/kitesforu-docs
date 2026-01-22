@@ -179,8 +179,30 @@ content = await extract_url_content(task.url)
 **Timeout**: 300 seconds
 **Budget**: 25%
 
+### Execution Modes
+
+#### Sequential Mode (Trial/Enthusiast)
+Waits for complete script from ScriptWorker, then processes TTS.
+
+#### Streaming Mode (Pro/Ultimate)
+When `streaming_mode: true` is set in the message, AudioWorker delegates to `StreamingScriptAudioWorker`:
+
+```
+LLM Stream → IncrementalDialogueParser → Parallel TTS (max 5) → Audio Combiner
+```
+
+**Benefits:**
+- 40-60% latency reduction
+- TTS starts before script completes
+- Position-based parser prevents duplicates
+
+**Key Classes:**
+- `StreamingScriptAudioWorker`: Combined script+TTS pipeline
+- `IncrementalDialogueParser`: Extracts dialogue items from streaming JSON
+- `StreamingScriptGenerator`: Async generator yielding DialogueItem
+
 ### What It Does
-1. Loads script
+1. Loads script (or generates via streaming)
 2. Synthesizes speech per segment
 3. Assigns different voices
 4. Mixes audio

@@ -164,11 +164,28 @@ stages:
     purpose: TTS synthesis, audio mixing, GCS upload
     inputs:
       - job_id: string
-      - script: dict
+      - script: dict (optional in streaming mode)
       - voice_quality: VoiceQuality
+      - streaming_mode: bool (optional, defaults false)
     outputs:
       - audio_url: string (GCS URL)
       - waveform_png_url: string (optional)
+
+    execution_modes:
+      sequential:
+        tiers: [trial, enthusiast]
+        description: Standard flow - waits for complete script
+        flow: ScriptWorker → AudioWorker
+      streaming:
+        tiers: [pro_creator, ultimate_creator]
+        description: Combined script+TTS with streaming LLM
+        flow: ToolsWorker → AudioWorker → StreamingScriptAudioWorker
+        components:
+          - StreamingScriptAudioWorker: Combined pipeline orchestrator
+          - IncrementalDialogueParser: Position-based JSON streaming parser
+          - StreamingScriptGenerator: AsyncIterator yielding DialogueItem
+        latency_reduction: 40-60%
+        max_concurrent_tts: 5
 
     responsibilities:
       - Convert script segments to speech
