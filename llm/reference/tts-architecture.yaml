@@ -1,6 +1,6 @@
 # file: llm/reference/tts-architecture.yaml
 # purpose: TTS (Text-to-Speech) system architecture and voice configuration
-# updated: 2026-01-15
+# updated: 2026-01-27
 # source: kitesforu-workers/config/tts_voices.yaml
 
 overview:
@@ -258,41 +258,90 @@ generation_flow:
       - TTSClient routes to _generate_gcp() with voice_id and language
 
 # =============================================================================
-# EMOTION RENDERING (PLANNED)
+# AUDIO EXPRESSION SYSTEM
 # =============================================================================
 
-emotion_support:
-  status: Planned
+expression_system:
+  status: Implemented
+  file: kitesforu-workers/src/workers/common/tts_expressions.py
 
-  current_state:
-    - ElevenLabs: voice_settings (stability, style) supported
-    - Google: Basic prosody via SSML possible but not implemented
-    - OpenAI: No direct emotion control
+  overview: |
+    The expression system embeds provider-specific audio tags directly in
+    generated scripts. Tags are processed at TTS time - supported tags pass
+    through, unsupported tags are stripped. This is fail-safe.
 
-  planned_architecture:
+  provider_capabilities:
+    elevenlabs:
+      capability: FULL
+      description: Native support for square-bracket audio tags
+      supported_tags:
+        - "[whispers]...[/whispers]"
+        - "[laughs]"
+        - "[sighs]"
+        - "[gasps]"
+        - "[dramatic tone]"
+        - "[sad tone]"
+        - "[excited]"
+      models_supported:
+        - eleven_flash_v2_5
+        - eleven_multilingual_v2
+        - eleven_turbo_v2_5
+
+    google:
+      capability: SSML
+      description: Prosody control via SSML tags
+      supported_tags:
+        - '<prosody rate="slow">...</prosody>'
+        - '<break time="500ms"/>'
+        - '<emphasis level="strong">...</emphasis>'
+      note: Non-SSML expression tags are stripped
+
+    openai:
+      capability: BASIC
+      description: No expression support - all tags stripped
+      behavior: strip_expression_tags() removes [tags] and <ssml>
+
+  content_type_profiles:
+    description: Maps content types to appropriate expression sets
+    profiles:
+      storytelling: {primary: [dramatic, whispers, gasps], intensity: "0.5-0.9"}
+      comedy: {primary: [laughs, excited], intensity: "0.6-1.0"}
+      meditation: {primary: [calm, soothing], intensity: "0.2-0.5"}
+      news: {primary: [professional], intensity: "0.4-0.6"}
+      educational: {primary: [warm, clear], intensity: "0.4-0.7"}
+      horror: {primary: [whispers, dramatic, gasps], intensity: "0.6-1.0"}
+
+  integration_flow:
     script_generation:
-      description: LLM generates emotion metadata per dialogue line
-      output:
-        text: "Welcome to our show!"
-        emotion: "warm"
-        intensity: 0.7
-        rate: 1.0
+      - Detect content type from outline
+      - Get TTS provider from tier selection
+      - Generate expression_guidance for that provider
+      - LLM generates script with provider-specific tags
 
-    provider_adapters:
-      elevenlabs:
-        method: voice_settings (stability, style)
-        emotion_mapping:
-          excited: {stability: 0.25, style: 0.8}
-          warm: {stability: 0.50, style: 0.5}
-          thoughtful: {stability: 0.60, style: 0.35}
+    tts_processing:
+      - ElevenLabs: Pass tags through to API
+      - Google: Use SSML if provided, strip other tags
+      - OpenAI: Strip all tags before API call
 
-      google:
-        method: SSML prosody tags
-        example: '<prosody rate="110%" pitch="+2st">Exciting news!</prosody>'
+  fallback_behavior: |
+    When provider fallback occurs (e.g., ElevenLabs → OpenAI):
+    1. TTS client detects provider mismatch
+    2. strip_expression_tags() removes all [tags] and <ssml>
+    3. Clean text sent to fallback provider
+    4. Process completes without errors
 
-      openai:
-        method: Limited (prompt engineering)
-        note: "OpenAI TTS has minimal emotion control"
+  emotion_metadata:
+    description: Additional metadata per dialogue line (separate from tags)
+    fields:
+      - emotion: "warm|excited|mysterious|calm|..."
+      - intensity: 0.0-1.0
+      - rate: 0.5-1.5 (speaking speed multiplier)
+    example:
+      speaker: "Narrator"
+      text: "[whispers]Listen carefully...[/whispers]"
+      emotion: "suspenseful"
+      intensity: 0.8
+      rate: 0.9
 
 # =============================================================================
 # QUICK REFERENCE
@@ -321,4 +370,5 @@ files:
   config: kitesforu-workers/config/tts_voices.yaml
   voice_selector: kitesforu-workers/src/workers/stages/audio/voice_selector.py
   tts_client: kitesforu-workers/src/workers/stages/audio/tts_client.py
+  tts_expressions: kitesforu-workers/src/workers/common/tts_expressions.py
   tests: kitesforu-workers/tests/test_voice_selector.py
