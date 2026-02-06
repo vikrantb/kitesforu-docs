@@ -12,16 +12,21 @@ The course system orchestrates content creation by calling the podcast API for e
 │                    (Separate Repository)                        │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  ┌──────────────────────┐    ┌──────────────────────────────┐  │
-│  │ CourseInitiatorWorker │───►│ CourseSyllabusWorker        │  │
-│  │ (Validate & create)   │    │ (LLM curriculum generation) │  │
-│  └──────────────────────┘    └──────────────┬───────────────┘  │
-│                                              │                  │
-│                                              ▼                  │
-│                              ┌──────────────────────────────┐  │
-│                              │ CourseModuleOrchestratorWorker│  │
-│                              │ (Creates podcasts via API)   │  │
-│                              └──────────────┬───────────────┘  │
+│  ┌──────────────────────┐    ┌─────────────────────────┐      │
+│  │ CourseInitiatorWorker │───►│ CoursePlannerWorker     │      │
+│  │ (Validate & create)   │    │ (Optional, runtime cfg) │      │
+│  └──────────────────────┘    └───────────┬─────────────┘      │
+│          │ (if planner disabled)          │ (if planner enabled)│
+│          ▼                               ▼                     │
+│  ┌──────────────────────────────┐                              │
+│  │ CourseSyllabusWorker         │                              │
+│  │ (LLM curriculum generation)  │                              │
+│  └──────────────┬───────────────┘                              │
+│                 ▼                                               │
+│  ┌──────────────────────────────┐                              │
+│  │ CourseModuleOrchestratorWorker│                              │
+│  │ (Creates podcasts via API)   │                              │
+│  └──────────────┬───────────────┘                              │
 │                                              │                  │
 │              ┌───────────────┬───────────────┼───────────────┐ │
 │              ▼               ▼               ▼               ▼ │
@@ -81,7 +86,7 @@ The course system orchestrates content creation by calling the podcast API for e
 **Responsibilities**:
 - Validate input parameters
 - Create course document in Firestore
-- Publish to syllabus generation
+- Route to planner or syllabus based on runtime config
 
 **Input**:
 ```json
@@ -97,6 +102,20 @@ The course system orchestrates content creation by calling the podcast API for e
     "context": "Optional context..."
 }
 ```
+
+### Stage 1.5: Workflow Planning (Optional)
+
+**Topic**: `course-planner`
+**Worker**: `CoursePlannerWorker`
+
+**Controlled by**: Firestore `pipeline_config/course_workers` → `planner_enabled`
+
+**Responsibilities**:
+- Determine workflow plan using deterministic routing (or LLM in Phase 2)
+- Validate plan against guardrails (step limits, credit caps, dependency checks)
+- Execute plan by publishing to downstream workers
+
+When `planner_enabled=false` (default), courses skip this stage and go directly from initiate to syllabus. Config changes take effect within 60 seconds (TTL cache), no redeploy needed.
 
 ### Stage 2: Syllabus Generation
 
@@ -228,14 +247,27 @@ headers = {
 | Topic | Worker | Description |
 |-------|--------|-------------|
 | `course-initiate` | CourseInitiatorWorker | Validates input, creates course doc |
+| `course-planner` | CoursePlannerWorker | Optional workflow planning |
 | `course-syllabus` | CourseSyllabusWorker | LLM generates curriculum |
 | `course-orchestrate` | CourseModuleOrchestratorWorker | Creates podcast jobs via API |
 
 ### Cloud Run Services
 
 - `course-initiate-worker`: Low resource (512Mi), high concurrency
+- `course-planner-worker`: Low resource (512Mi), long timeout (1 hour)
 - `course-syllabus-worker`: Medium resource (1Gi), LLM calls
 - `course-orchestrate-worker`: Higher resource, long timeout (1 hour)
+
+### Runtime Pipeline Config
+
+Stored in Firestore `pipeline_config/course_workers`:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `planner_enabled` | bool | `false` | Route initiate → planner instead of → syllabus |
+| `planner_mode` | string | `deterministic_only` | Routing strategy |
+| `max_workflow_steps` | int | `5` | Maximum steps in a workflow plan |
+| `max_credits_per_workflow` | float | `50.0` | Maximum credits per workflow |
 
 ## Repository Structure
 
@@ -246,12 +278,18 @@ kitesforu-course-workers/
 │   │   ├── base.py              # BaseWorker class
 │   │   ├── server.py            # FastAPI Pub/Sub dispatcher
 │   │   ├── exceptions.py        # Custom exceptions
+│   │   ├── config/              # Runtime pipeline config
+│   │   │   ├── pipeline_config.py  # Firestore-backed config with TTL cache
+│   │   │   └── stage_resolver.py   # Routing abstraction
 │   │   └── stages/
 │   │       ├── initiator/       # CourseInitiatorWorker
+│   │       ├── planner/         # CoursePlannerWorker (optional)
 │   │       ├── syllabus/        # CourseSyllabusWorker
 │   │       └── orchestrator/    # CourseModuleOrchestratorWorker
 │   └── services/
 │       └── podcast_api_client.py # HTTP client for API
+├── scripts/
+│   └── seed_pipeline_config.py  # Seed Firestore config doc
 ├── tests/
 ├── Dockerfile
 ├── cloudbuild.yaml
