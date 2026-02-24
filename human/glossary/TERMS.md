@@ -2,6 +2,10 @@
 
 > **FOR HUMAN CONSUMPTION ONLY** - AI agents should skip this folder
 
+## Content Entities
+
+See [ENTITIES.md](./ENTITIES.md) for canonical names and definitions of everything a user can create (Quick Audio, Audio Series, Classroom, Interview Prep, Writing).
+
 ## Domain Terms
 
 ### Job
