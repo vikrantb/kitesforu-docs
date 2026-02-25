@@ -57,7 +57,7 @@ Personalized mock interview coaching audio. Structured as a course with intervie
 
 | Field | Value |
 |-------|-------|
-| Internal type | `course` (with `style: 'Interview'`) |
+| Internal type | `interview_prep` (activity), `course` (Firestore, with `style: 'Interview'`) |
 | Firestore collection | `courses` |
 | Icon | 💼 |
 | Nav label | "Interview Prep" |
@@ -150,46 +150,46 @@ The "make something new" dropdown in the nav bar. Contains all content types plu
 
 **Current Create menu items:**
 
-| Label | Description | Route |
-|-------|-------------|-------|
-| Smart Create | AI picks the best format for you | `/create-smart` |
-| Quick Audio | AI-researched audio podcast | `/create-smart?template=topic-explainer` |
-| Audio Series | Multi-episode audio course | `/create-smart?template=concept-deep-dive` |
-| Interview Prep | Personalised coaching audio | `/create-smart?template=tech-interview` |
-| Study Guide | Turn coursework into audio | `/create-smart?template=exam-review` |
-| Creative Story | Horror, comedy, romance & more | `/create-smart?template=horror-series` |
-| Classroom | Audio lessons with quizzes | `/create-smart?template=k12-elementary` |
-| Written Content | Blog posts, newsletters & more | `/create-smart?template=blog-post` |
+| Label | Description | Route | Section |
+|-------|-------------|-------|---------|
+| Start with AI | Describe your idea, AI builds it | `/create-smart` | — |
+| Quick Audio | One episode on any topic | `/create-smart?template=topic-explainer` | Audio |
+| Audio Series | Multi-episode deep dive | `/create-smart?template=concept-deep-dive` | Audio |
+| Fiction & Stories | Serialized narratives | `/create-smart?template=horror-series` | Audio |
+| Classroom | Lessons with quizzes | `/create-smart?template=k12-elementary` | Education |
+| Study Audio | Turn notes into audio | `/create-smart?template=exam-review` | Education |
+| Interview Prep | Mock interview coaching | `/create-smart?template=tech-interview` | Education |
+| Blog & Newsletter | Articles & email content | `/create-smart?template=blog-post` | Writing |
 
-### My Library (Browse)
+### My Library
 The "view what you've made" dropdown. Contains activity feed and per-type views.
 
-**Current Browse menu items:**
+**Current Library menu items:**
 
 | Label | Description | Route |
 |-------|-------------|-------|
-| My Activity | Everything in one place | `/activity` |
-| My Series | View all your content | `/courses` |
-| My Classes | Manage your classrooms | `/classes` |
-| My Writeups | Blog posts, newsletters & more | `/writeups` |
-| Course Library | Browse published courses | `/classes/library` |
+| My Activity | Everything you've created | `/activity` |
+| Audio Series | Episodes & series | `/courses` |
+| Classrooms | Lessons & quizzes | `/classes` |
+| Writing | Articles & newsletters | `/writeups` |
+| Explore | Community courses | `/classes/library` |
 
 ### My Activity
 The unified feed showing everything a user has created, across all content types. Supports:
 - **Grouped view** (default) — items organized by type
 - **Flat view** — chronological list with infinite scroll
-- **Type filters** — Quick Audio, Series, Classes, Writeups
-- **Status filters** — Completed, Generating, Draft, Failed, etc.
+- **Type filters** — Quick Audio, Audio Series, Interview Prep, Classrooms, Writing
+- **Status filters** — Completed, In Progress, etc.
 
 ---
 
 ## Developer Cross-Reference
 
-| User-facing name | Internal type | API field value | Firestore collection | Activity API `content_type_label` |
-|-----------------|---------------|-----------------|---------------------|-----------------------------------|
+| User-facing name | Internal type | Activity type | Firestore collection | Activity API `content_type_label` |
+|-----------------|---------------|---------------|---------------------|-----------------------------------|
 | Quick Audio | `podcast` | `podcast` | `podcast_jobs` | "Quick Audio" |
 | Audio Series | `course` | `course` | `courses` | "Audio Series" |
-| Interview Prep | `course` | `course` | `courses` | "Audio Series" (style=Interview) |
+| Interview Prep | `course` (style=Interview) | `interview_prep` | `courses` | "Interview Prep" |
 | Classroom | `class` | `class` | `classes` | "Classroom" |
 | Writing | `writeup` | `writeup` | `writeups` | Format-specific (e.g., "Blog Post") |
 
