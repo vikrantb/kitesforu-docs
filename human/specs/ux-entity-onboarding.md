@@ -79,6 +79,18 @@ Entity naming system documented in `ENTITIES.md` and `entity-dictionary.md`. Nav
 - Creation quiz ("What should I create?")
 - Sample/example content
 
+## Status: COMPLETE
+
+All 7 items implemented and deployed (frontend PR #178, revision 327). Quality fixes applied in PR #180:
+
+- `hooks/useFirstVisit.ts` extracted as standalone reusable hook (was inlined in FirstVisitBanner)
+- `components/InfoTooltip.tsx` extracted as reusable Radix Popover component (was inlined SectionHint with fragile absolute positioning)
+- Help page FAQ updated: "Smart Create" → "Start with AI" (matching current nav label)
+
+### Intentional deviation
+
+- **Browse label**: Spec says "My Audio Series" but deployed label is "Audio Series" — the dropdown itself is named "My Library" so prefixing each item with "My" is redundant. Only "My Activity" uses "My" because it's a cross-type feed.
+
 ## Testing
 
 - Visual verification on staging
