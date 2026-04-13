@@ -1,0 +1,173 @@
+---
+title: "Voice Instrumentation · Picker v2 Improvements"
+description: "How KitesForU learned to spot four kinds of weak answers it used to miss — and the safety gate that keeps your voice interview fast no matter what the picker does."
+sidebar_position: 2
+tags:
+  - voice
+  - mastery-engine
+  - interview-prep
+status: shipped-shadow-mode
+flag: feature_voice_picker_v2_live
+---
+
+import { Callout } from "@/components/Callout";
+import { Steps } from "@/components/Steps";
+
+<Callout type="info">
+  Like the first shadow-logging rollout, the v2 picker runs in **shadow
+  mode**. The picker is watching your answers and recording which drill
+  it *would have* surfaced. Nothing new plays in the audio yet.
+</Callout>
+
+## What changed
+
+The Voice-First Mastery Engine uses a tiny, fast function called the
+**provisional picker** to decide, in real time, which kind of practice
+drill to consider after each of your answers. The picker has to decide
+in a handful of milliseconds — it runs on the same thread that is
+generating the interviewer's voice, and that thread cannot afford to
+stall.
+
+Picker v1 shipped with shadow logging. We then ran a pilot where a
+human strategy audit scored the picker against 24 real voice turns. The
+audit found four specific ways the picker was guessing wrong. **Picker
+v2 fixes all four.**
+
+## The four patches
+
+<Steps>
+
+### 1. Result language now understands quantified deltas
+
+Before v2, the picker only recognised the word "result" or the verbs
+"reduced / improved / increased / saved / shipped". A great answer that
+said *"load time dropped from 8 seconds to 400 milliseconds"* was being
+flagged as **missing a result**, because the picker literally did not
+understand that phrasing as a result.
+
+v2 teaches the picker several new shapes of result:
+
+- Delta verbs — *dropped, rose, fell, cut, climbed, doubled, tripled*
+- "From X to Y" phrasing — *"went from 800ms to 240ms"*
+- Arrow deltas — *"p99: 600ms → 120ms"*
+- Percent deltas — *"40% conversion lift"*
+- Multipliers — *"5x improvement"*
+- Time-bounded deltas — *"under 400 milliseconds"*, *"within 3 weeks"*
+
+Three of three false positives in the audit are fixed by this patch.
+
+### 2. New check: Did you set the stage?
+
+A strong answer opens by setting the stage — *"At Stripe in 2024, my
+payments team was facing…"* — before walking into the result. A weak
+answer skips straight to the result: *"I cut p99 latency from 800ms to
+240ms and saved $340k."* That answer has numbers, it has a result, but
+it never told the listener **where and when**.
+
+v2 introduces a new drill arm called `missing_star_situation` that
+fires when the answer has a result but never set the stage (no
+company, no team, no time anchor, no "at X" prefix). The prompt is:
+*"Rewind. Tell me the company, the team, and the time window before
+the result."*
+
+### 3. Ownership check now works on every question type
+
+The v1 picker only ran the ownership check (*"we > I"*) on
+behavioural questions. If you answered a system-design question with
+heavy *"we"* usage, the picker silently skipped ownership because the
+question's skill keys pointed at system-design, not ownership.
+
+v2 decouples the check from the question's declared focus area. The
+picker now always evaluates ownership and attaches a canonical
+behavioural skill key so the **Mastery Trace** can still correlate
+the drill with a stable ontology reference.
+
+### 4. New check: Are you being specific?
+
+Generic answers are the hardest kind to catch with keyword rules,
+because they are strong by every surface measure — they have numbers,
+they have verbs, they read confidently — and yet they say nothing
+concrete. *"Last quarter our team shipped a major feature and drove
+15% activation."* Which company? Which product? Which team? Nothing.
+
+v2 adds a `missing_specificity` check that counts **proper nouns**
+(company names, product names, team names), **years**, and **months**
+as specificity anchors. If an answer lacks all of them, the picker
+surfaces a drill asking you to *"Name the company, the team, and one
+product or system."*
+
+</Steps>
+
+## Bonus fix: numbers with units
+
+While implementing the four audit patches, we also found and fixed a
+latent bug in the v1 picker. The number-detection regex had a trailing
+word-boundary that silently rejected any number with a unit suffix —
+`800ms`, `$340k`, `12GB`, `5x` were all being treated as if they were
+not numbers at all. The strongest-seeded answer type in the pilot
+("40% reduction in p95 latency") was the one most affected. v2 now
+recognises unit-suffixed numbers as quantified signal.
+
+## The hard latency gate
+
+<Callout type="warning">
+  Audio responsiveness is sacred. The picker never gets to stall the
+  voice turn.
+</Callout>
+
+Adding four new rules to a function that runs on the audio thread is
+exactly the kind of change that can silently break a product. v2
+therefore ships with a **hard latency gate** wrapped around the
+picker.
+
+### How it works
+
+- The picker is given a **hard budget** of 10 milliseconds per call.
+- The gate measures every call and logs a structured warning if the
+  picker exceeds the budget.
+- On budget violation, the gate returns a safe fallback decision
+  (*no drill*) with a dedicated `latency_gate_tripped` reason code
+  so downstream analytics can distinguish gate-tripped turns from
+  genuine no-signal turns.
+- If the picker ever raises an exception, the gate catches it, logs
+  it, and returns the same fallback. The gate **never** raises —
+  the audio thread cannot handle exceptions mid-turn.
+
+### Why this matters
+
+The voice turn budget is 900 milliseconds. The v2 picker's p99
+latency on realistic transcripts is under 1 millisecond. The 10ms
+gate is a **10x safety margin** that a future regression would have
+to blow through before any user noticed. And even if something
+somehow did blow through it, the voice turn would still play
+normally — the mastery feature sheds first, not the voice.
+
+This is the rule the voice-first charter enforces:
+
+> Mastery features must shed before voice quality sheds.
+
+## What is shipping
+
+| Piece | Where it lives | Shadow flag |
+| --- | --- | --- |
+| Picker v2 rules | `mastery.provisional_picker` | *always on inside the gate* |
+| Latency gate | `mastery.latency_gate` | *always on* |
+| Shadow logging of the new decisions | `mastery.shadow` | `feature_voice_picker_v2_live` |
+| Tooltip on the voice-instrumentation anchor | Frontend | `feature_voice_picker_v2_live` |
+
+Coaching is still silent. The engine is only watching for now.
+
+## What you will notice as a user
+
+Nothing, yet. That is by design. Before any drill becomes audible we
+want a second clean audit pass on picker v2 against fresh voice data.
+The [Voice Instrumentation · Shadow Logging](./shadow-logging) page
+explains the rollout phases in more detail.
+
+## Reference
+
+- Audit record: `audit_data.md` (N=24, 75.0% agreement, 82.4% precision,
+  82.4% recall)
+- Proposal: `proposals/voice-first-mastery-engine.md` — the original
+  charter that defines the picker's budget and shed-first rule
+- Related: [Voice Instrumentation · Shadow Logging](./shadow-logging)
