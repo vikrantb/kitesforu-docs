@@ -1,0 +1,159 @@
+---
+title: "Voice Instrumentation · Reconciliation & Projection"
+description: "How the coaching engine turns one voice turn into a durable record, double-checks it with a slower judge, and feeds it back into your next interview — without the voice ever slowing down."
+sidebar_position: 3
+tags:
+  - voice
+  - mastery-engine
+  - interview-prep
+status: shipped-shadow-mode
+flag: feature_voice_reconciliation_live
+---
+
+import { Callout } from "@/components/Callout";
+import { Steps } from "@/components/Steps";
+
+<Callout type="info">
+  Like the first two rollouts, this ships in **shadow mode**. The
+  reconciliation and projection pipeline is running behind the scenes;
+  nothing new is audible in your interviews yet.
+</Callout>
+
+## What this is
+
+Every time you finish a voice answer, three fast things happen on the
+audio thread:
+
+1. The provisional picker decides, in under a millisecond, what kind of
+   drill your answer *probably* needs — numbers, result, stage,
+   ownership, specificity.
+2. The picker's decision is wrapped in an immutable envelope and
+   pushed to a queue.
+3. Your interviewer's next sentence starts playing.
+
+That is the complete story of the audio thread. It never waits for a
+database read. It never waits for a model call. It never waits for a
+slower "real" judge to second-guess the picker.
+
+**Reconciliation and projection** is the slow, careful part of the
+loop that runs entirely *off* the audio thread. It is what turns a
+stream of fast provisional decisions into the durable, authoritative
+record that shapes your next interview.
+
+## Three pure functions, one async loop
+
+<Steps>
+
+### 1. The rubric judge reconciler
+
+After your answer, a separate worker pulls the envelope off the queue
+and runs an **authoritative rubric judge** — the slow, expensive
+version of the picker that sees the full five-dimension rubric:
+specificity, quantified impact, role-outcome clarity, ownership, and
+level-appropriateness.
+
+The judge may take several hundred milliseconds. It is allowed to call
+language models. It is allowed to read your history. But none of that
+touches the voice.
+
+When the judge is done, the reconciler compares it to the picker's
+earlier guess and produces one of four outcomes:
+
+- **Confirmed** — the judge agrees with the picker. Same drill, same
+  reason. The picker was right; move on.
+- **Corrected** — the judge agrees the answer needs a drill but picks
+  a different one. The Mastery Trace records the correction so
+  analytics can see where the picker's heuristics disagree with the
+  rubric.
+- **Added** — the picker thought the answer was fine, but the judge
+  found something worth coaching. A net-new drill is surfaced.
+- **Dismissed** — the picker flagged something and the judge said
+  no, it was fine. The provisional decision is quietly withdrawn.
+
+The reconciler is a pure function. Same inputs, same outputs, every
+time. It never blocks on I/O.
+
+### 2. The projection fold
+
+Once a turn is reconciled, its decision is folded into two per-user
+projections:
+
+- **DimensionLedger** — a per-skill rollup that tracks how many times
+  a skill has been exposed, how many times it needed a drill, and a
+  **recency-weighted** drill score. The score decays at 0.9 per
+  exposure, which halves after about seven turns — fast enough to
+  react when you start hitting a skill cleanly, slow enough that one
+  lucky answer doesn't wipe out a real gap.
+
+- **SkillGraph** — a ranked top-N view over the ledger. This is what
+  the room loader reads when you join your next interview. It tells
+  the picker which weaknesses are currently most load-bearing, so the
+  picker's history-aware carry-forward check has something to work
+  with.
+
+Both projections are **rebuildable** from the turn trace log. If one
+gets corrupted, the consumer replays the log and rebuilds it from
+scratch. They are never the source of truth — only a fast view on top
+of it.
+
+### 3. Snapshot refresh
+
+When you join your next interview, the control-plane loader takes the
+SkillGraph for your user and folds it into the room snapshot — the
+tiny, bounded blob of state the audio thread is allowed to read. The
+refresh is a pure function too. It hydrates the snapshot's recent
+weakness summary from the top-ranked skills in your graph, caps the
+result at five entries, and marks the snapshot fresh.
+
+By the time the audio thread looks at the snapshot, every projection
+read has already happened — off-thread, before the room was marked
+ready.
+
+</Steps>
+
+## Why this preserves the voice-first charter
+
+<Callout type="warning">
+  Mastery features shed before voice quality sheds. Always.
+</Callout>
+
+The voice-first charter has four rules. The reconciliation and
+projection pipeline was designed explicitly around them:
+
+| Rule | How this pipeline honours it |
+| --- | --- |
+| 1. Audio thread does nothing slow | All three functions are pure, run off-thread, and are never called from the audio path |
+| 2. Bounded join-time snapshot only | The only thing the audio thread ever sees is a five-item `recent_weakness_summary` that was populated *before* the room was ready |
+| 3. Async durability only | The reconciler and fold are the async pipeline — they *are* the durable handoff |
+| 4. Mastery sheds before audio | If the consumer falls over, the voice keeps playing. The snapshot just comes in with an older weakness list next time. |
+
+## Staleness is handled intentionally
+
+A subtle but important rule: the snapshot refresh is a **no-op** when
+the projection is older than the snapshot's last applied live
+envelope. This happens when the shadow-logging queue has already
+replayed fresh envelopes into the snapshot in memory, but the
+projection hasn't caught up yet.
+
+Refreshing in that case would overwrite fresh data with stale data,
+so the refresh function returns the snapshot unchanged. The next
+projection rebuild will catch up. This is the kind of invariant that
+feels over-cautious until one day it saves a user's mock interview
+from getting wiped.
+
+## What you will notice as a user
+
+Nothing, yet. Coaching is still silent. The reconciler is logging
+confirmation / correction / addition / dismissal events to the
+Mastery Trace so we can see how often the picker's fast heuristics
+agree with the slower authoritative rubric. Once that agreement rate
+clears the same audit bar picker v2 cleared (≥75%, ≥80% precision and
+recall), the downstream coaching layer unlocks — and you will start
+hearing the picker's strongest drills inline in your next interview.
+
+## Reference
+
+- Proposal: `proposals/voice-first-mastery-engine.md` — especially
+  §4 (Async Durability Pipeline) and §5 (New Runtime Topology)
+- Related: [Voice Instrumentation · Picker v2 Improvements](./picker-v2-improvements)
+- Related: [Voice Instrumentation · Shadow Logging](./shadow-logging)
