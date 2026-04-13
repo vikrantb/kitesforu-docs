@@ -1,0 +1,155 @@
+---
+title: "Voice Instrumentation · Shadow Logging"
+description: "How KitesForU silently learns from your voice interviews before any coaching surfaces — the first step in the Voice-First Mastery Engine rollout."
+sidebar_position: 1
+tags:
+  - voice
+  - mastery-engine
+  - interview-prep
+status: shipped-shadow-mode
+flag: feature_voice_instrumentation_live
+---
+
+import { Callout } from "@/components/Callout";
+import { Steps } from "@/components/Steps";
+
+<Callout type="info">
+  This feature ships in **shadow mode** first. KitesForU is observing your
+  voice sessions silently and learning what to coach before any coaching
+  surfaces in the audio. You will hear exactly the same interviewer you
+  heard yesterday.
+</Callout>
+
+## What this is
+
+The **Voice-First Mastery Engine** is the system KitesForU uses to turn every
+voice interview you complete into personalized coaching on your next session.
+The engine has three phases in its rollout, and **Voice Instrumentation** is
+phase one:
+
+1. **Voice Instrumentation (shadow logging)** — this page
+2. **Live coaching** — the interviewer's follow-up questions adapt in real time
+3. **Cross-session adaptation** — starting difficulty, tone, and focus area
+   adjust to your recent history
+
+Voice Instrumentation is the foundation all three phases sit on. It is the
+pipe that turns each answered voice turn into a durable, tenant-scoped,
+replayable event.
+
+## What changes in your experience
+
+**Nothing.** The whole point of shadow logging is that you cannot hear it.
+
+- The interviewer's voice does not change
+- The question flow does not change
+- The feedback you see between turns does not change
+- The latency of your voice turn does not change
+
+If you hear a difference, something is wrong and you should file a support
+ticket.
+
+## What happens under the hood
+
+<Steps>
+  <Steps.Step title="You finish a voice turn">
+    Silero VAD detects your silence, OpenAI's streaming transcriber returns
+    your final transcript, and ElevenLabs Flash v2.5 starts speaking the
+    interviewer's next question. No change to any of this.
+  </Steps.Step>
+  <Steps.Step title="The provisional picker runs in milliseconds">
+    A deterministic, pure-function picker reads your transcript and the
+    current question's canonical skill tags. In a handful of milliseconds
+    it decides: "this answer is missing a number in the result," or "this
+    answer is good, no drill needed."
+
+    There is no LLM on this path. There is no database lookup on this path.
+    The picker is **safe for the audio thread** — it never blocks, never
+    waits on the network, never delays the next question.
+  </Steps.Step>
+  <Steps.Step title="The turn becomes an immutable event">
+    KitesForU wraps the picker's decision in a queue envelope that carries:
+    your tenant, org, and user identifiers; the session id; the turn id;
+    the transcript; the question's skill tags; and the picker's reason
+    code and confidence.
+
+    The envelope is enqueued locally in the room process. A background
+    task drains the local queue into Pub/Sub so the durable write never
+    blocks your audio.
+  </Steps.Step>
+  <Steps.Step title="The room catches up if it opened stale">
+    If your room opened while our projection cache was behind the event
+    stream — for example, because you just finished a session two minutes
+    ago and the rollup worker has not caught up yet — the room replays
+    any pending queue envelopes into its in-memory snapshot before your
+    first turn. You notice nothing. The system corrects itself.
+  </Steps.Step>
+  <Steps.Step title="Observation, not action">
+    For now, the picker's decision is logged for our team to audit. It
+    does not yet drive the interviewer's follow-up. That wiring ships in
+    a later PR after we have observed ≥ 100 real voice turns and
+    validated that the provisional picker agrees with our rubric judge
+    at least 70% of the time.
+  </Steps.Step>
+</Steps>
+
+## Why we ship shadow-first
+
+Three reasons, in order of importance:
+
+1. **Audio responsiveness is sacred.** Our voice turn budget is 900ms from
+   your silence to the first TTS audio frame. Anything that might spend 20ms
+   of that budget on a heuristic has to earn the spend. Shadow mode lets us
+   measure the real cost before we take it.
+
+2. **The picker's accuracy needs ground truth.** The picker is deterministic
+   pattern-matching on your transcript. The real rubric judge is a much
+   slower LLM call that produces the authoritative signal. We want to see
+   how often the cheap picker agrees with the expensive judge on real
+   sessions **before** we let the cheap picker drive interviewer behavior.
+
+3. **Privacy and trust.** Every event we emit is tenant-scoped from the first
+   byte. If your organization is on the enterprise tier, your voice event
+   stream lives under a path prefix only your tenant can read, and the event
+   payload itself carries redundant tenant/org/user identifiers so any
+   downstream job can enforce isolation without trusting only the path.
+
+## What you can do today
+
+If you are using the voice interview preview, the answer is short:
+**use it normally**. That is the ground truth we are calibrating against.
+
+If you are an operator wanting to watch the logs: look for structured log
+entries with the key `voice_mastery_shadow_pick` and the field
+`reason_code`. The reason codes you will see in shadow mode are:
+
+- `missing_quantified_impact` — the answer did not name a number in the result
+- `missing_star_result` — the answer did not state an outcome
+- `weak_ownership_language` — the answer used "we" more than "I"
+- `carry_forward_quantified_impact` — a previous turn flagged this weakness and
+  the current answer still has not addressed it
+- `insufficient_signal` — the answer did not trigger any of the above; no drill
+  would have been offered
+
+## Opt-out and data retention
+
+Voice Instrumentation writes to an immutable event log retained for 90 days.
+After 90 days, raw events are folded into cross-session projections and the
+original event documents are deleted. Projections retain numeric rollups
+only, not raw transcripts.
+
+If your organization has a GDPR or contractual requirement to delete all
+voice events for a specific user, that cascade deletes the event log, the
+projections, and the skill graph in one idempotent operation.
+
+## When coaching goes live
+
+The next PR in this chain (PR B) wires the picker into the interviewer's
+follow-up voice. When that lands, you will see a micro-tooltip in the app
+the first time you start a voice session in a newly instrumented room.
+Until then, shadow mode is silent by design.
+
+## Related
+
+- Proposal: [`Voice-First Mastery Engine`](/proposals/voice-first-mastery-engine)
+- Feature flag: `feature_voice_instrumentation_live` (default: `false`)
+- Code PR: `kitesforu-workers` — `feat(pr-a): voice mastery substrate — shadow logging + catch-up replay`
