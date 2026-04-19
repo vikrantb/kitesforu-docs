@@ -128,8 +128,8 @@ One card component, different metadata per type:
 - [x] Filter pills work correctly — 5 pills: All, Interview Prep, Audio Series, Classes, Writing
 - [x] Search filters in real-time (300ms debounce) — `useDebounce` imported
 - [x] Sort works (Newest, A-Z, Status) — SortKey type has `recent | alpha | status`
-- [ ] Old routes redirect correctly with type pre-selected — `/courses`, `/classes`, `/writeups`, `/activity` still render their own pages; redirects NOT yet implemented
-- [ ] Interview hub metrics appear when Interview Prep filter is active — needs verification
+- [x] Old routes redirect correctly with type pre-selected — shipped in frontend PR #419: `/activity` → `/library`, `/courses` → `/library?type=course`, `/classes` → `/library?type=class`, `/writeups` → `/library?type=writeup`. Nested routes continue to render independently.
+- [x] Interview hub metrics appear when Interview Prep filter is active — shipped in frontend PR #421: `components/library/InterviewHubMetricsCard.tsx` renders 3 KPIs (active programs / mastery traces / average score) as a header card.
 - [x] Mobile responsive (single column, horizontal pill scroll)
 - [ ] Loads in < 2s on 3G (parallel API calls) — needs perf measurement
 - [x] Empty states for no content and no search results
@@ -208,7 +208,7 @@ Replace the current Create mega-menu + My Library dropdown with direct links:
 | Fri | Deploy to beta, verify all redirects + library + nav | Both |
 
 ### Testing Checklist
-- [ ] All old routes redirect correctly
+- [x] All old routes redirect correctly — frontend PR #419
 - [ ] Library shows content from all types
 - [ ] Content created via smart-create appears under correct filter
 - [ ] Interview prep content appears under Interview Prep filter
