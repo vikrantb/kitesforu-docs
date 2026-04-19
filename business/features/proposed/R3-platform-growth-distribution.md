@@ -56,10 +56,10 @@ R1 fixed how users find and navigate. R2 fixed content quality. R3 fixes how the
 - QR code generation for in-person sharing
 
 ### Acceptance Criteria
-- [ ] Share button visible on ALL content detail pages
-- [ ] Public share page works without authentication
-- [ ] Share modal includes social platforms + copy link
-- [ ] View/play counts tracked for shared content
+- [x] Share button visible on ALL content detail pages — frontend PR #425 (plus prior PRs): classes have full ShareContentModal + ShareButton; writeups have ShareButton; courses now have both (PR #425 wired the missing Share+Distribute trigger). Studio/podcast detail still uses generation-surface patterns; full-modal share is N/A because ShareContentModal doesn't support the podcast variant yet.
+- [x] Public share page works without authentication — `/courses/shared/` and `/classes/join/[shareToken]` routes render without login
+- [x] Share modal includes social platforms + copy link — `components/sharing/ShareModal.tsx` + `components/ShareContentModal.tsx` (distribution tab adds Apple/Spotify/YouTube/Amazon)
+- [ ] View/play counts tracked for shared content — needs analytics wiring; not yet implemented
 
 ---
 
