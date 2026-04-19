@@ -107,11 +107,11 @@ Simple admin page at `/admin/analytics` showing:
 - Search queries (to inform template creation)
 
 ### Acceptance Criteria
-- [ ] All key events tracked
+- [x] All key events tracked — frontend PRs #429–#435. Unified funnel includes `content_created`, `create_abandoned`, `content_completed`, `mock_completed`, `player_action`, `library_filter`, `library_search`, `shared_content_view`, `shared_content_play`, plus navigation events `template_selected` / `persona_selected`. All dispatched from `lib/analytics.ts`.
 - [ ] Analytics dashboard shows daily metrics
-- [ ] Creation funnel visible (start → generated → played)
-- [ ] Audio completion rate measurable by content type
-- [ ] No PII in event data
+- [x] Creation funnel visible (start → generated → played) — `create_abandoned` (drop-off at intent/plan/question), `content_created` (successful creation), and `content_completed` (natural playback end) together cover the funnel per content type.
+- [x] Audio completion rate measurable by content type — `content_completed` carries `content_type`; `content_created` pairs with the same `content_type`, so completion rate is derivable per type.
+- [x] No PII in event data — trackers in `lib/analytics.ts` carry only IDs, content types, share tokens, enum fields (persona, template, action), and numeric metrics. No email, name, or free-text user input beyond a truncated search query.
 
 ---
 
@@ -143,7 +143,7 @@ Simple admin page at `/admin/analytics` showing:
 - [ ] All UI strings externalized to messages files
 - [ ] Language selector in user settings
 - [x] Library shows language badges on cards — frontend PR #427: `AudioContentCard` renders a flag + language code pill for non-English items (English suppressed as the 90%+ default). `data-language` attribute also exposed on the card root for future filtering wiring.
-- [ ] Library filterable by language
+- [x] Library filterable by language — frontend PR #428: `/library?lang=<bcp47>` adds a filter dropdown populated with the languages actually present on the user's items. Initial value comes from `?lang=`, so the filter is deep-linkable. Paired with PR #427's language badge pill.
 - [ ] RTL CSS foundations in place (logical properties)
 
 ---
