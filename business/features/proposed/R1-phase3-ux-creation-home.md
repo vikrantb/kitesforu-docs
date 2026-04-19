@@ -82,12 +82,12 @@ Click → `/create-smart?template={id}`
 Template sections become horizontal scroll rows. Hero input is full-width.
 
 ### Acceptance Criteria
-- [ ] `/create` shows hero input + template grid
-- [ ] Smart suggestions appear based on typing
-- [ ] Each template links to `/create-smart?template={id}`
-- [ ] "Start from scratch" links to `/create-smart` (no template)
-- [ ] Mobile: sections are horizontal scrollable rows
-- [ ] Page loads fast (no API calls — templates are client-side data)
+- [x] `/create` shows hero input + template grid — `app/create/page.tsx` ships hero input + 5 template sections
+- [ ] Smart suggestions appear based on typing — **deferred**; needs an intent classifier not yet exposed
+- [x] Each template links to `/create-smart?template={id}`
+- [x] "Start from scratch" links to `/create-smart` (no template)
+- [x] Mobile: sections are horizontal scrollable rows
+- [x] Page loads fast (no API calls — templates are client-side data) — `TemplateCard` data is static
 
 ---
 
@@ -143,13 +143,13 @@ Persona-based template suggestions from the API. 3 cards showing templates the u
 No Continue section. Quick Actions show defaults. Recent replaced with "Get Started" cards. Recommended still shows.
 
 ### Acceptance Criteria
-- [ ] Greeting is time-aware and contextual
-- [ ] Continue section shows in-progress items (hidden if none)
-- [ ] Quick Actions adapt to user's primary_persona
-- [ ] Recent shows last 8 items with correct types and statuses
-- [ ] Recommended suggests persona-relevant templates
-- [ ] New user sees appropriate getting-started experience
-- [ ] Mobile responsive (single column)
+- [x] Greeting is time-aware and contextual — `greetingForHour()` in HomeDashboard.tsx
+- [x] Continue section shows in-progress items (hidden if none) — conditional "Continue" SectionHeader
+- [x] Quick Actions adapt to user's primary_persona — `QuickActionsSection({ persona })`
+- [x] Recent shows last 8 items with correct types and statuses
+- [x] Recommended suggests persona-relevant templates — `getRecommendedTemplates(persona)` via `RecommendedSection`
+- [x] New user sees appropriate getting-started experience — Hero + PersonaSection fall-through for empty state
+- [x] Mobile responsive (single column)
 
 ---
 
@@ -172,11 +172,11 @@ In `services/smart_create/intake.py`, when `classification_confidence < 0.7` and
 In `useSmartCreateChat`, handle the `clarify_content_purpose` event by showing 3 tappable option buttons in the chat. User's selection is sent as a follow-up message that includes `content_purpose` metadata.
 
 ### Acceptance Criteria
-- [ ] Ambiguous prompts trigger a one-question clarification
-- [ ] Three options: studying/prep, work, entertainment
-- [ ] Selected purpose flows through to `content_purpose` on the resulting document
-- [ ] Clear prompts (with template or strong keywords) skip the question
-- [ ] The question feels natural in the chat flow, not like a form
+- [x] Ambiguous prompts trigger a one-question clarification — PR #239 via `<<QUICK:>>` pattern in chat prompts
+- [x] Three options: studying/prep, work, entertainment — rendered as QuickActionButtons in chat UI
+- [ ] Selected purpose flows through to `content_purpose` on the resulting document — **naming collision**: the code's `content_purpose` is already used for content TYPE (course/class/writeup/podcast/interview_prep). The clarify answer currently drives `content_category`/`content_domain`, not `content_purpose`. Needs a docs/code semantic decision before this can be checked off.
+- [x] Clear prompts (with template or strong keywords) skip the question — PR #239 skip triggers: template selected, topic implies purpose ('horror story', 'interview prep', 'study guide'), pasted JD or syllabus
+- [x] The question feels natural in the chat flow, not like a form — piggybacks on existing quick-reply infrastructure (no new SSE event/FE code)
 
 ---
 
