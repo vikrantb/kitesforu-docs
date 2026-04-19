@@ -59,7 +59,7 @@ R1 fixed how users find and navigate. R2 fixed content quality. R3 fixes how the
 - [x] Share button visible on ALL content detail pages — frontend PR #425 (plus prior PRs): classes have full ShareContentModal + ShareButton; writeups have ShareButton; courses now have both (PR #425 wired the missing Share+Distribute trigger). Studio/podcast detail still uses generation-surface patterns; full-modal share is N/A because ShareContentModal doesn't support the podcast variant yet.
 - [x] Public share page works without authentication — `/courses/shared/` and `/classes/join/[shareToken]` routes render without login
 - [x] Share modal includes social platforms + copy link — `components/sharing/ShareModal.tsx` + `components/ShareContentModal.tsx` (distribution tab adds Apple/Spotify/YouTube/Amazon)
-- [ ] View/play counts tracked for shared content — needs analytics wiring; not yet implemented
+- [x] View/play counts tracked for shared content — frontend PR #426: `shared_content_view` fires on public share page load; `shared_content_play` fires on each episode play in a shared course. Events carry `share_token` + `content_id` so the owning user can be attributed without the viewer signing in.
 
 ---
 
@@ -142,7 +142,7 @@ Simple admin page at `/admin/analytics` showing:
 ### Acceptance Criteria
 - [ ] All UI strings externalized to messages files
 - [ ] Language selector in user settings
-- [ ] Library shows language badges on cards
+- [x] Library shows language badges on cards — frontend PR #427: `AudioContentCard` renders a flag + language code pill for non-English items (English suppressed as the 90%+ default). `data-language` attribute also exposed on the card root for future filtering wiring.
 - [ ] Library filterable by language
 - [ ] RTL CSS foundations in place (logical properties)
 
