@@ -43,10 +43,20 @@ Do NOT trigger on `naturalness` warnings — those are already auto-fixed by `va
   - `should_regenerate(gate_result, attempt_count) -> RegenDecision` — returns reason list + bool
   - `build_regen_hints(gate_result) -> list[str]` — translates metrics into imperative strings that format-match the existing `_quality_warnings` consumer
 
-### Wire-in point (move from post-audio to pre-TTS)
+### Wire-in point (architectural constraint — see below)
 Today's gate runs at `streaming_script_audio_worker.py:460` — AFTER audio is built. That's too late for regen because TTS spend is already committed.
 
-Add a **script-only** gate call in `_run_streaming_pipeline` BEFORE TTS workers dispatch. Keep the existing post-audio call for metrics parity. The pre-TTS call is the decision point.
+Naïve approach: add a **script-only** gate call BEFORE TTS workers dispatch. But this does not work as-is because `_run_streaming_pipeline` interleaves script-chunk generation with TTS enqueue (the whole point of streaming is that TTS starts before the full script is ready). There is no clean "script done, TTS not started" checkpoint in the current pipeline.
+
+### Wire-in architecture — three strategies considered
+
+1. **Bad-path serialize (recommended for v1).** Stream as today. When the *last* script chunk closes, run the quality gate but block the audio-combine step. On CRITICAL failure, cancel all pending / in-flight TTS tasks for that job, regenerate the script **non-streamingly** with regen hints, then re-run TTS on the new script. Happy path (≥85% of jobs) keeps full streaming speed; only the small bad-path tail serializes. Adds ~15–25s latency to the bad tail, saves a ~$0.04 TTS spend on the discarded first pass.
+
+2. **Full buffer.** Buffer the entire script before TTS dispatch, gate, regen if needed, then start TTS. Gives clean pre-TTS gating but kills streaming for everyone (~30–60s user-visible delay on happy path). Rejected.
+
+3. **Two-stage (speculative + confirm).** Start TTS on early chunks speculatively, gate at chunk boundary midway through, cancel + regen remainder if the partial gate fails. Much more complex; gate signals are mostly whole-script (emotion variety, speaker balance) and don't give useful partial signal. Deferred.
+
+**v1 ships strategy 1.** The regular (non-streaming) script worker already has the clean checkpoint — mirror the loop there first as the reference implementation, then port the bad-path-serialize variant to the streaming worker.
 
 Wrap script generation in a loop (`max_attempts=2`). On attempt-1 failure:
 1. Merge `build_regen_hints(...)` into `preferences["_quality_warnings"]`
@@ -89,7 +99,8 @@ Script generation is ~$0.02 of the $0.083/ep pipeline. At ~15% trigger rate and 
 ## Acceptance criteria
 
 - [ ] New `regen_policy` module with unit-tested `should_regenerate` + `build_regen_hints`
-- [ ] Streaming worker wires script-only gate call BEFORE TTS dispatch with max 2 attempts
+- [ ] Regular script worker wires gate + regen loop first (reference implementation, clean pre-TTS checkpoint)
+- [ ] Streaming worker adopts bad-path-serialize strategy: gate at end of last script chunk, cancel pending TTS on CRITICAL failure, regenerate non-streamingly, re-run TTS
 - [ ] Regular script worker mirrors the same loop
 - [ ] Regen hints reach the script LLM via existing `_quality_warnings` preference hook (no template changes)
 - [ ] Firestore fields (`regen_*`, `attempt_*_metrics`, `quality_note`) populate as specified
