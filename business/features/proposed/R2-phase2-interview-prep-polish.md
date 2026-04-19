@@ -87,7 +87,7 @@ When `content_purpose === 'interview_prep'` and a company name is detected:
 ### Acceptance Criteria
 - [ ] Company-specific questions in mock interviews
 - [ ] Specific, actionable feedback (not generic praise)
-- [ ] Session history with score trends visible
+- [x] Session history with score trends visible — frontend PR #436: `ScoreTrendSparkline` above the Mastery Traces feedback ledger on `/interview-prep/hub`. Plots each session's `latestTrace.weightedScore` (max 8 points, oldest left, newest right) with a qualitative "Trending up / Holding steady / Trending down" label and the first→latest delta as muted metadata. Hidden when fewer than 2 scored sessions exist.
 - [ ] Voice mock uses real speech recognition (not setTimeout theater)
 - [ ] Follow-up questions probe weak answers
 
