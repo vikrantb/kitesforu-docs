@@ -162,7 +162,7 @@ Add to:
 ### Acceptance Criteria
 - [x] Car Mode button visible in FullPlayer and content detail page — FullPlayer.tsx line 75+ builds `/drive?...` link from current content context
 - [x] Clicking Car Mode opens Drive with correct content pre-loaded — contentType + contentId + episodeIndex all threaded
-- [ ] Q&A button visible in FullPlayer — **still missing** (Q&A only in /drive Car Mode, not in FullPlayer)
+- [x] Q&A button visible in FullPlayer — shipped in PR #422: MessageCircle button next to Car Mode deep-links to `/drive?...&mode=live&qa=1`, auto-activating QuickQuestionOverlay once the car-mode session is ready. Podcasts are excluded (their pipeline doesn't support live sessions).
 - [x] Q&A overlay opens and works (voice + text input) — `QuickQuestionOverlay` in `components/drive/`
 - [x] Episode pauses during Q&A (no speech over speech) — memory rule documented
 
@@ -224,13 +224,13 @@ Already exists as `useSleepTimer` hook. Surface it in the FullPlayer:
 
 ### Acceptance Criteria
 - [x] Sleep timer accessible from FullPlayer — `SleepTimerButton` wired in FullPlayer (line 264)
-- [ ] Timer options: 15/30/45/60 min + end of episode — 15/30/45/60 shipped; **end-of-episode still missing**
+- [x] Timer options: 15/30/45/60 min + end of episode — end-of-episode shipped in PR #420 via `lib/audio-events.ts` pub/sub. `useAudioPlayer.handleEnded` emits; `SleepTimerButton` subscribes and toggles `sleep.setEndOfTopic`. Mutually exclusive with the count-down presets.
 - [x] Gentle volume fade-out when timer expires — 3s fade (0.9→0 over final 3s) in `useSleepTimer`
 - [ ] Download button on detail page
 - [ ] Downloaded episodes playable offline
 - [ ] Download badge visible in library cards
 
-**Status:** Sleep timer substantively shipped. Offline downloads (Service Worker + Cache API) not yet implemented — only playback pre-buffering exists in `useAudioPlayer`.
+**Status:** Sleep timer fully shipped (including end-of-episode, PR #420). Offline downloads (Service Worker + Cache API) not yet implemented — only playback pre-buffering exists in `useAudioPlayer`.
 
 ---
 
