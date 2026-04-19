@@ -35,10 +35,10 @@ This preserves the "theater" (no raw numbers) while giving the user context.
 In the mastery slice (`hooks/voice/slices/masterySlice.ts`), when the ribbon label changes, emit a `transition_reason` string. The WeaveSurface renders it as a 3-second fade-in/fade-out toast above the ribbon.
 
 ### Acceptance Criteria
-- [ ] Ribbon transition shows a qualitative reason for 3 seconds
-- [ ] No raw numbers (pressure/support/mastery values) exposed
-- [ ] Toast fades in/out smoothly, doesn't block interaction
-- [ ] All 4 transitions have appropriate messages (Teach, Practice, Stress-Test, Review)
+- [x] Ribbon transition shows a qualitative reason for 3 seconds — frontend PR #423: `MasteryTransitionToast` reads `lastUpdate.transitionReason` and auto-hides after 3s
+- [x] No raw numbers (pressure/support/mastery values) exposed — `buildTransitionReason` in `masterySlice.ts` is pure qualitative; enforced by a load-bearing test (`never leaks raw numeric values into the transition reason`)
+- [x] Toast fades in/out smoothly, doesn't block interaction — opacity + translateY transition with `pointer-events-none` wrapper
+- [x] All 4 transitions (teach/practice/stress_test/review) have appropriate messages — `buildTransitionReason` branches on destination label with context-aware copy
 
 ---
 
@@ -145,10 +145,10 @@ The gap analysis data comes from the existing `/v1/interview-prep/analyze-gaps` 
 This preserves all the value of the current `/interview-prep/hub` metrics within the unified library.
 
 ### Acceptance Criteria
-- [ ] Interview dashboard header appears when Interview Prep filter is active
-- [ ] Shows: active programs, modules, mock sessions, average score
-- [ ] Quick launch buttons for mock interview and mastery traces
-- [ ] Header collapses/hides when user scrolls past it
+- [x] Interview dashboard header appears when Interview Prep filter is active — frontend PR #421
+- [x] Shows: active programs, modules, mock sessions, average score — programs/traces/score shipped in #421; modules count added in #424
+- [x] Quick launch buttons for mock interview and mastery traces — "Start mock" in #421; "Mastery traces" link added in #424
+- [x] Header collapses/hides when user scrolls past it — card is non-sticky, scrolls naturally above the sticky filter bar
 
 ---
 
