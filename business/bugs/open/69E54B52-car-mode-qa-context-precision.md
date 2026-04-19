@@ -1,9 +1,19 @@
 # 69E54B52 — Car Mode Q&A returns generic answers despite having segment context
 
-**Status**: OPEN
+**Status**: DEPLOYED_NOT_VERIFIED
 **Reported**: 2026-04-19 by product owner during live drive-test
 **Priority**: P1 — precision is the core promise of per-episode Q&A
 **Surface**: `/car-mode?topic=...` Quick Question overlay
+**Fix PRs (minimum viable slice)**:
+- kitesforu-schemas #67 — `CarModeDialogueLine` + `CarModeSegment.dialogue` (v1.47.0) — merged 2026-04-19
+- kitesforu-workers #290 — persist per-line dialogue on both phase 1 and phase 2 writes — merged 2026-04-19
+- kitesforu-api #241 — inject verbatim current-segment dialogue into Q&A prompt with "WHAT THE LISTENER JUST HEARD" block — merged 2026-04-19
+
+**Awaiting**: beta verification on a freshly generated Car Mode session (legacy sessions generated before PR #290 have empty `dialogue` and fall back to summary-only context). Move to `closed/` once a post-fix session shows the LLM quoting specific lines when asked "what did you just say about X".
+
+**Deferred follow-ups (not blocking closure)**:
+- Per-line timestamps + `_locate_current_line` line-level window (originally scoped) — current fix ships segment-level precision which is already a huge gain.
+- Frontend "Checking what you just heard…" pre-answer state via new `context_loading` SSE event.
 
 ## Reported symptom (verbatim)
 
