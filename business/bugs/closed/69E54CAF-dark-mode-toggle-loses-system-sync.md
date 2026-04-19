@@ -1,9 +1,11 @@
 # 69E54CAF — Dark-mode toggle loses OS sync permanently after first click
 
-**Status**: OPEN
+**Status**: FIXED
 **Reported**: 2026-04-19 by product owner
 **Priority**: P2 — degrades user experience but not blocking
 **Surface**: Navbar theme toggle, all pages
+**Fix PRs**: kitesforu-frontend #457 (3-state cycle: light → dark → system → light) — merged 2026-04-19
+**Verification**: moved to `closed/` once beta confirms toggle cycles through an "auto" state and the OS `prefers-color-scheme` change is tracked live.
 
 ## Reported symptom
 

@@ -1,9 +1,11 @@
 # 69E54B51 — Car Mode audio concurrency (two voices at once)
 
-**Status**: OPEN
+**Status**: FIXED
 **Reported**: 2026-04-19 by product owner during live drive-test
 **Priority**: P0 — core Q&A flow is unusable
 **Surface**: `/car-mode?topic=...` on beta
+**Fix PRs**: kitesforu-frontend #456 (pause-on-assistant-speak) — merged 2026-04-19
+**Verification**: moved to `closed/` once beta revision 00574+ confirms no overlap between episode audio and Q&A TTS during a full ask→answer cycle.
 
 ## Reported symptom (verbatim)
 
