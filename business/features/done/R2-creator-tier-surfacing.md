@@ -1,6 +1,6 @@
 # R2 — Creator Tier Surfacing (A/B Audio Samples + Tier Toggle)
 
-**Status**: PROPOSED
+**Status**: SHIPPED SCAFFOLD (2026-04-20) — code in place, manifest upload is the remaining human-approved step. See Implementation Summary at bottom.
 **Priority**: P2
 **Effort**: ~1 week (sample generation + PlanSection UI + pricing wiring)
 **Origin**: 2026-04-19 strategy pass — option #7 (make the quality tier legible before purchase)
@@ -97,3 +97,25 @@ Wire into:
 - Plan preview: `kitesforu-frontend/app/create-smart/_components/PlanSection.tsx`
 - Persona catalog: `kitesforu-workers/personas/` (YAML source of truth)
 - TTS providers: `kitesforu-workers/src/workers/stages/audio/providers/`
+
+---
+
+## Implementation Summary (2026-04-20) — scaffold shipped across 3 repos, manifest upload pending
+
+**API — kitesforu-api PR #245 (MERGED)**: `GET /v1/tier-samples?lang=` public endpoint. Reads `manifest.json` from the public GCS bucket (`KITESFORU_AUDIO_ASSETS_BUCKET`, defaults to `kitesforu-dev-audio-assets`) under `tier-samples/{lang}/`. Returns `{samples: [], lang, manifest_version}`. Graceful-null contract: a missing blob, GCS exception, or JSON error all return an empty list with 200 — the public signed-out pricing page can never 500 because of this aux asset. `Cache-Control: public, max-age=86400`. Per-process in-memory manifest cache per lang. 6 unit tests pinning the never-500 / cache / happy-path / skip-malformed contract.
+
+**Frontend — kitesforu-frontend PR #475 (MERGED)**: `components/audio/TierSampleCard.tsx`. Fetches the API once on mount. Groups samples by `archetype` → archetype dropdown + tier tabs (stable order: free / creator / pro / business; missing tiers skip without shifting siblings). Inline `<audio preload="none">` with explicit pause + reset on tier switch so clips never overlap. **Ship-safe empty state**: returns `null` while loading, on fetch error, and when the manifest is empty — lets both mount surfaces (`PlanSection`, `/pricing`) render day one before any MP3 exists; the card lights up automatically once the manifest is uploaded. Dark-mode aware; labelled heading + `role=tablist` + aria-label on play button + "Sample" copy so clips cannot be mistaken for personal output. 4 Jest tests pin the contract.
+
+**Workers — kitesforu-workers PR #297 (MERGED)**: `scripts/generate_tier_samples.py`. Produces 4 archetypes × 4 providers = 16 MP3s + `manifest.json`. Same script across tiers inside an archetype so the audible delta is attributable to voice quality alone. Fixed public-domain-safe copy (creator content never sampled). Uploads to `gs://${bucket}/tier-samples/{lang}/{archetype}/{provider}.mp3` + `.../manifest.json`. Guardrails: `--dry-run` (verified locally, prints all 16 rows), `--archetype` / `--tier` for targeted regeneration, manifest write suppressed if zero samples succeeded (never clobbers a healthy catalog), per-provider errors logged and skipped.
+
+**Remaining human-approved step**: run `python scripts/generate_tier_samples.py --lang en-US` in an environment with OPENAI_API_KEY + GOOGLE_APPLICATION_CREDENTIALS + INWORLD_API_KEY + ELEVENLABS_API_KEY configured. Cost ~$0.64 per language. Once the manifest lands in GCS, the frontend card lights up on `/pricing` and every `PlanSection` — no additional deploy needed.
+
+**Deviations from the proposal**:
+- Tier labels match current pricing tiers (Free / Creator / Pro / Business) rather than the proposal's older Free/Standard/Pro/Studio naming — the frontend component lives on the live pricing page, so it uses that taxonomy.
+- Spec acceptance-criterion "Playwright test: click each tier tab in turn, assert MP3 src changes" — deferred to post-manifest-upload beta smoke (the Jest tests pin the rendering contract synthetically; the live Playwright run needs real MP3 URLs to assert).
+- Language auto-switch (AC out of scope) — the component accepts a `lang` prop defaulting to `en-US`; wiring it to the app's i18n context is a future follow-up once additional-language manifests exist.
+
+**Deferred follow-ups**:
+- Run the script in production environment to populate `en-US` manifest; subsequent language runs as we add locales.
+- Playwright E2E on beta post-upload.
+- Analytics hook points on surface click-through (stubbed as `data-surface="plan-section|pricing"` on the root div; instrument with the app's analytics helper once usage is worth measuring).
