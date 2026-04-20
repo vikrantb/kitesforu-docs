@@ -1,9 +1,52 @@
 # R1 — Car Mode Production Hardening
 
-**Status**: PROPOSED
+**Status**: SUBSTANTIALLY DONE — P1 (UX) and P2 (course adjustment) shipped; P3 (backend pipeline parity) mostly shipped; P4 (polish) has remainders
 **Priority**: P0 (core differentiator has user-visible regressions + architectural debt)
-**Effort**: ~3 weeks across frontend + workers + API, broken into 4 phases
-**Origin**: 2026-04-19 audit — four parallel research agents on code, integration, and live UI; plus user-reported regression (mic transcribes but no follow-up answer is heard, course does not adjust).
+**Effort**: shipped in ~1 day of dense PR work (dramatically shorter than the original ~3-week estimate — most phases were scoped tightly and the foundation was more solid than the audit suggested)
+**Origin**: 2026-04-19 audit — four parallel research agents on code, integration, and live UI; plus user-reported regression.
+
+## Implementation summary (2026-04-19)
+
+### ✅ P1 — Q&A feedback loop
+- **kitesforu-frontend #451** — phantom Commands-mode transcript no longer rendered as a question; rapid pause/resume uses live `audio.paused` instead of React state mirror; ask-button is a proper toggle (dismiss on second click); `speechSynthesis.cancel()` in cleanup only fires when we own the synth; gesture-label setTimeout leak closed.
+- **kitesforu-frontend #452** — Q&A 429 retry with exponential backoff; iOS auto-resume via player toggle on auto-dismiss; 4s auto-clear on stale `lastTranscript` / `lastCommand`.
+- **kitesforu-frontend #453** — **Q&A answers are now spoken**. `useEffect` watches `drive.quickQuestion.answer` + `isThinking`; speaks via orchestrator once SSE stream completes (suggestions populated). Capped at 3 sentences to bound episode-pause time.
+- **kitesforu-frontend #454** — debounce Q&A speak until SSE stream completes using `suggestions.length > 0` as the "done" signal (prevents mid-stream stutter).
+- **kitesforu-frontend #455** — hide phantom voice-commands mic button when the inner `useVoiceCommands` hook is disabled (Car Mode owns voice via orchestrator).
+- **kitesforu-frontend #456** — bug 69E54B51: **pause-on-assistant-speak, not on user-talk-start**. Orchestrator now exposes `onSpeakStart` / `onSpeakEnd` callbacks; Car Mode page wires them to `drive.toggle` with a `pausedByOrchestratorRef` guard so the episode only resumes if we paused it.
+
+### ✅ P2 — Course adjustment from questions (bug 69E54B54, 4 slices)
+- **kitesforu-frontend #459** — intent classifier + curated patter rotation; directives no longer hit the planner.
+- **kitesforu-schemas #68** (v1.48.0) — `CarModeEditRequest` + `edit_generation` + `CarModeSession.current_edit_generation`.
+- **kitesforu-api #242** — `POST /v1/car-mode/session/:id/edit` with Firestore transaction + Pub/Sub publish. Rate limit 3/min. 409 on concurrent edits.
+- **kitesforu-workers #291** — `execute_regenerate` truncates segments[from_index:], regenerates with user hint in previous_summaries, stamps each new segment with `edit_generation`, lifecycles `edit_request.status` through pending → in_flight → applied / failed.
+- **kitesforu-frontend #460** — directive path calls the edit endpoint, speaks patter immediately, falls back to failure patter on 409 / error.
+
+### ✅ P3 — Backend pipeline parity (substantially shipped)
+- **kitesforu-schemas #67** (v1.47.0) — `CarModeDialogueLine` + `CarModeSegment.dialogue` field.
+- **kitesforu-workers #290** — worker persists per-line dialogue to every segment (bug 69E54B52 foundation).
+- **kitesforu-api #241** — Q&A prompt now includes a `WHAT THE LISTENER JUST HEARD` verbatim dialogue block + rule telling the LLM to quote the exact line.
+- **kitesforu-workers #292** — **Car Mode persona wiring**: `_select_persona_voice` runs once per session, cached on SegmentState; all three TTS call sites thread `persona_voice_config` so Car Mode finally picks up the 20-persona voice catalog + tier-aware cost gates (Inworld / Google for free tier; ElevenLabs only for paid).
+
+### ✅ P4 — UX hardening
+- **kitesforu-frontend #450** — persona-card solid-dark base (switch from `/10` alpha that read as pastel) + 10 adjacent pastel-50 surface sweeps.
+- **kitesforu-frontend #457** — bug 69E54CAF: dark-mode toggle is now a proper 3-state cycle (light → dark → system → light) so the OS sync default is reachable after the first click.
+
+### Deferred follow-ups (not blocking "done" closure)
+- Frontend-side `edit_generation` SSE filtering — without it, a stale pre-regen segment can briefly play after a directive. Acceptable for v1. Tracked in bug 69E54B54's deferred list.
+- Visible regen progress UI (spinner during `in_flight`).
+- Per-line Q&A context with timestamps + "checking what you just heard…" state. Shipped segment-level precision in #241 / #290; per-line is a follow-up.
+- Debounce multiple rapid directives (coalesce hints).
+- Language parity for Q&A answer TTS — today answers still speak via browser `speechSynthesis` in default locale. Episode-voice backend TTS for answers is a future enhancement.
+
+### Verification status
+- All PRs merged.
+- Beta revisions live since 2026-04-19.
+- Bugs `69E54B51` + `69E54CAF` moved to `bugs/closed/`.
+- Bugs `69E54B52` + `69E54B54` in `bugs/open/` with status `DEPLOYED_NOT_VERIFIED` — awaiting live listen-through confirmation before moving to `closed/`.
+
+---
+
 
 ## Problem
 

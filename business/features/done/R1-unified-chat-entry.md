@@ -1,9 +1,32 @@
 # R1 — Unified Chat as the Central Entry
 
-**Status**: PROPOSED
+**Status**: DONE — shipped behind `feature_home_unified_chat_live`, flag flipped ON by default
 **Priority**: P1
-**Effort**: ~1 week (frontend routing + landing polish)
+**Effort**: ~1 day (shorter than the ~1-week estimate; most of the routing was already in place)
 **Origin**: 2026-04-19 product-owner note after live drive-test of Car Mode Q&A.
+
+## Implementation summary
+
+**Shipped** (2026-04-19, all merged):
+- `kitesforu-frontend` PR #458 — `app/page.tsx` split into `UnifiedHome` + `LegacyHome` branches gated on `feature_home_unified_chat_live` (default ON).
+- New `components/home/CentralChatLauncher.tsx` with cycling placeholder rotation, voice input, 500-char cap, autofocus, aria-live char counter.
+- New feature flag `feature_home_unified_chat_live` in `lib/feature-flags.ts` — OFF falls back to the previous persona-grid layout without a revert.
+- `lib/analytics.ts` — `trackHomeCentralChatSubmit({input_length, used_voice, from_section})`.
+- Car Mode promoted to a prominent peer button alongside "Continue listening".
+- Persona grid demoted into a collapsed native `<details>` section ("Pick a template instead") — SEO-preserved, still indexable.
+
+**Variations from the proposal**:
+- Signed-out home did NOT change — `SignedOutHero` still used as-is. The proposal suggested a parallel signed-out central input; we kept the existing signed-out story because it already performs well. Can revisit later.
+- A/B feature-flag gating is a binary kill switch (global ON / OFF), not per-user. Acceptable for first roll since the previous layout is the fallback with one flag flip.
+
+**Routing contract**: every submission from the central input goes to `/create-smart?text=...`. The existing Smart Create planner classifies intent and proposes a plan. `classifyInput` (old keyword router) is NOT used — intentional, so the planner owns classification.
+
+**Verification**:
+- `pnpm type-check` + `pnpm build` pass.
+- Beta smoke-tested: central input routes, Car Mode button works, "Pick a template instead" expands.
+
+---
+
 
 ## Problem
 
