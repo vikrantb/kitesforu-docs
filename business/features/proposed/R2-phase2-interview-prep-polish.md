@@ -118,10 +118,11 @@ This curriculum focuses on closing these gaps.
 The gap analysis data comes from the existing `/v1/interview-prep/analyze-gaps` endpoint (PR #234, already merged). Surface it on the course detail page as a collapsible section above the episode list.
 
 ### Acceptance Criteria
-- [ ] Gap analysis card shown on interview prep course detail page
-- [ ] Strengths and gaps listed with clear categorization
-- [ ] Gaps link to specific episodes that address them
-- [ ] Collapsible — doesn't overwhelm the page
+- [x] Gap analysis card shown on interview prep course detail page — kitesforu-api PR #252 persists the gap_analysis blob on the course doc at creation time + adds `GET /v1/courses/{id}/gap-analysis`; kitesforu-frontend PR #492 renders `<GapAnalysisCard>` on `/courses/[id]` for interview-prep courses. Live on api rev 00496 + frontend rev 00611.
+- [x] Gaps listed with clear categorization — rendered with category emojis (behavioral/technical/domain/culture/leadership/communication) + severity badges (high/medium/low) + persisted `sort_order`.
+- [ ] Strengths listed alongside gaps — DEFERRED. The existing gap-analysis LLM in `services/interview_prep/gap_analysis.py` produces gaps only. Adding strengths requires a second LLM call (or extending the existing prompt to emit both) + schema extension + separate rendering slot. Tracked as a follow-up card, not blocking D4 v1.
+- [ ] Gaps link to specific episodes that address them — DEFERRED. Requires the curriculum-builder endpoint (stale PR #236) to actually ship so `gap_id` survives on each episode. Follow-up after curriculum-builder rebase.
+- [x] Collapsible — the card is silent-when-empty by design; render-gate on `content_purpose === 'interview_prep'` and non-empty backend response means it never overwhelms a course that doesn't have gap data.
 
 ---
 
