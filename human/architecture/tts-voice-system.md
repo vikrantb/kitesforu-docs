@@ -107,28 +107,111 @@ voices:
 | Pro Creator | ElevenLabs | eleven_flash_v2_5 |
 | Ultimate Creator | ElevenLabs | eleven_multilingual_v2 |
 
-## Emotion Support (Planned)
+## Audio Expression System
 
-### Current State
-- **ElevenLabs**: Supports emotion via `voice_settings` (stability, style)
-- **Google**: Supports SSML prosody tags (not yet implemented)
-- **OpenAI**: Limited emotion control
+The TTS expression system enables natural, expressive audio by embedding provider-specific audio tags directly in generated scripts. The system is fail-safe—if tags can't be processed, they're stripped without breaking audio generation.
 
-### Future Architecture
+### Provider Capabilities
 
-Script generation will include emotion metadata:
+| Provider | Capability | Tag Format | Example |
+|----------|------------|------------|---------|
+| **ElevenLabs** | Full expressions | Square brackets | `[whispers]Hello[/whispers]` |
+| **Google** | SSML prosody | XML tags | `<prosody rate="slow">Hello</prosody>` |
+| **OpenAI** | Basic (stripped) | N/A | Tags removed before TTS |
+
+### How It Works
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                   Script Generation                               │
+│                                                                    │
+│  1. Detect content type (storytelling, meditation, news, etc.)   │
+│  2. Get TTS provider from tier selection                          │
+│  3. Generate expression_guidance for that provider                │
+│  4. LLM generates script WITH provider-specific tags              │
+└──────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                      TTS Client                                    │
+│                                                                    │
+│  ElevenLabs → Pass tags through (native support)                  │
+│  Google → Convert to SSML or strip non-SSML tags                  │
+│  OpenAI → Strip ALL tags (no expression support)                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### ElevenLabs Audio Tags
+
+Supported audio tags for eleven_flash_v2_5 and eleven_multilingual_v2:
+
+| Tag | Effect | Use Case |
+|-----|--------|----------|
+| `[whispers]...[/whispers]` | Soft, breathy | Secrets, intimacy |
+| `[laughs]` | Natural laugh | Comedy, joy |
+| `[sighs]` | Exhale | Frustration, relief |
+| `[gasps]` | Sharp intake | Surprise, shock |
+| `[dramatic tone]` | Theatrical delivery | Suspense, reveals |
+| `[sad tone]` | Somber voice | Emotional moments |
+| `[excited]` | Energetic delivery | Enthusiasm |
+
+### Content Type Profiles
+
+The system maps content types to appropriate expression sets:
+
+| Content Type | Primary Expressions | Intensity Range |
+|--------------|---------------------|-----------------|
+| **storytelling** | dramatic, whispers, gasps | 0.5-0.9 |
+| **comedy** | laughs, excited, dramatic | 0.6-1.0 |
+| **meditation** | calm, soothing, gentle | 0.2-0.5 |
+| **news** | professional, neutral | 0.4-0.6 |
+| **educational** | warm, clear, engaging | 0.4-0.7 |
+
+### Script Output with Expressions
+
+```json
+{
+  "speaker": "Narrator",
+  "text": "[whispers]Listen carefully...[/whispers] The door creaked open. [gasps] Someone was already inside.",
+  "emotion": "suspenseful",
+  "intensity": 0.8,
+  "rate": 0.9
+}
+```
+
+### Fallback Behavior
+
+When provider fallback occurs (e.g., ElevenLabs → OpenAI due to quota):
+
+1. **Tag Detection**: TTS client detects provider mismatch
+2. **Tag Stripping**: `strip_expression_tags()` removes all expression tags
+3. **Clean Text**: Pure text sent to fallback provider
+4. **No Errors**: Process completes successfully with basic voice
+
+```python
+# Fail-safe: strips [tags] and <ssml> before sending to OpenAI
+clean_text = strip_expression_tags(text_with_tags)
+# Result: "Listen carefully... The door creaked open. Someone was already inside."
+```
+
+### Emotion Metadata
+
+In addition to inline tags, dialogue items include emotion metadata:
+
 ```json
 {
   "speaker": "Host1",
   "text": "Welcome to our show!",
   "emotion": "warm",
-  "intensity": 0.7
+  "intensity": 0.7,
+  "rate": 1.0
 }
 ```
 
-Provider adapters will convert generic emotions to provider-specific formats:
-- **ElevenLabs**: `{stability: 0.5, style: 0.5}`
-- **Google**: `<prosody rate="105%" pitch="+1st">...</prosody>`
+This metadata is used for:
+- TTS voice settings (ElevenLabs stability/style)
+- Pacing control (rate affects speaking speed)
+- Analytics and quality tracking
 
 ## Related Files
 
@@ -136,7 +219,8 @@ Provider adapters will convert generic emotions to provider-specific formats:
 |------|---------|
 | `config/tts_voices.yaml` | Voice configuration (YAML) |
 | `voice_selector.py` | Voice selection logic |
-| `tts_client.py` | TTS API calls |
+| `tts_client.py` | TTS API calls, tag stripping |
+| `tts_expressions.py` | Expression system, provider renderers |
 | `llm/reference/tts-architecture.yaml` | Full technical spec |
 
 ## FAQ
