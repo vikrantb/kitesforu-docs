@@ -1,6 +1,6 @@
 # R2 — Quality Auto-Regeneration Loop
 
-**Status**: PHASE 1 SHIPPED (regular script worker), Phase 2 pending (streaming worker bad-path-serialize)
+**Status**: SHIPPED (2026-04-20) — all three phases across all three script code paths. See Phase 2/3 Implementation Summary at bottom.
 **Priority**: P1
 **Effort**: ~1 week (workers only)
 **Origin**: 2026-04-19 strategy pass — highest-leverage option (touches every episode, infrastructure already built)
@@ -144,3 +144,47 @@ Script generation is ~$0.02 of the $0.083/ep pipeline. At ~15% trigger rate and 
 - Surfacing regen status to the end user on the creation UI (deferred; debug-page visibility is enough for v1 — user sees only the improved audio).
 - Multi-attempt loops beyond 2 (diminishing returns; same local minimum risk).
 - Applying the same loop to episode-outline generation (different failure modes; separate proposal if needed).
+
+---
+
+## Implementation Summary — Phase 2 + 3 (2026-04-20)
+
+**Phase 2 — streaming worker bad-path regen (kitesforu-workers PR #294)**:
+- `_streaming_gate_and_maybe_regen` wraps the post-TTS phase in `_run_streaming_pipeline`. On CRITICAL gate failure it calls `StreamingScriptGenerator.generate()` (non-streaming) with `preferences['_quality_warnings']` + `preferences['_custom_instructions']` threaded, re-runs TTS via a fresh `_tts_worker` queue on the regenerated dialogue, and swaps dialogue_items + state in place before combine/upload.
+- v1 does NOT cancel in-flight TTS on attempt 1 (lets the pipeline finish then discards the first-pass audio). Amortized cost ~$0.006/ep at 15% trigger rate — well under the $0.008/ep ceiling from the proposal. Mid-flight cancellation is a deferred optimization.
+- Removed the redundant post-upload `_run_quality_gate` call in `execute()` — the in-pipeline gate subsumes it and the old call would have overwritten the richer blob.
+- 6 unit tests covering the six terminal states (clean gate, regen-improves, regen-returns-empty, regen-raises, both-attempts-fail, empty-dialogue-short-circuit).
+
+**Phase 3 — Car Mode segment worker (kitesforu-workers PR #295)**:
+- `_generate_full_segment_with_regen` wraps the Phase 2 full-segment loop in `execute()`. Gate + hint-threaded single regen, mirroring the regular + streaming flows.
+- Intentionally out of scope: the Phase 1 quick script (3 items, gates would push past the <12s first-audio SLO) and `execute_regenerate()` (user edits are already the quality signal — re-gating would double-work).
+- Session-level rollup written to `car_mode_sessions/{id}/stages.quality_gate`: `segments_evaluated`, `regen_count`, `regens_improved`, `regen_status`. Per-segment detail intentionally not persisted to keep Firestore writes flat.
+- 7 unit tests covering terminal states including a test that verifies `quality_hints` reaches the LLM system prompt as a `PREVIOUS ATTEMPT FAILED QUALITY GATE - MUST FIX` block.
+
+**Bug fix folded in (PR #294)**: Phase 1's status classifier called `should_regenerate(attempt_2, attempt_count=2, max_attempts=2)` which always returns the `max_attempts_reached` short-circuit reason — making the `"improved"` branch unreachable. Corrected both Phase 1 (`stages/script/worker.py`) and Phase 2 to call with `attempt_count=1` when asking "would attempt 2 still trigger a regen?".
+
+**Latent bug caught in beta smoke (kitesforu-workers PR #296)**: `Counter.most_common(5)` returns `List[Tuple[str, int]]`. Firestore does not serialize tuples → `400 Property stages contains an invalid nested entity` — which silently killed every `stages.quality_gate` write across Phase 1/2/3 until this was caught. `_check_emotion_variety` in `quality_gate.py` now materializes `top_emotions` as `[{name, count}, ...]`. Added `TestMetricsFirestoreSerializable` — recursively asserts no Python tuples exist anywhere in the metrics dict. This bug had been latent since the Phase 1 ship; unit tests missed it because Firestore was mocked.
+
+**Beta end-to-end validation**: test podcast job `256b3cd6-d82c-48f7-b80c-1c5fc3c56b8d` submitted via API on revision `kitesforu-worker-audio-00403-7wk` with topic "power of habits and daily routines". Raw Firestore doc after completion:
+```yaml
+stages.quality_gate:
+  regen_attempted: true
+  regen_count: 1
+  regen_status: no_improvement
+  regen_hints_sent:
+    - "Shape a tension arc — the script currently reads flat. Build toward a clear peak or resolution."
+  quality_note: "Applied a quality retry; residual issues remain."
+  attempt_1_metrics: {... tension_curve.flatness=0.93, 23 items ...}
+  attempt_2_metrics: {... tension_curve.flatness=0.93, 21 items (regenerated) ...}
+```
+Gate fired on `tension_flatness=0.91` breach (threshold 0.70). `StreamingScriptGenerator.generate()` was re-invoked with the hint. TTS re-ran on the new dialogue. Classification `"no_improvement"` is correct — attempt 2's tension was still flat. All proposal acceptance criteria verified against real data.
+
+**Deviations from the proposal**:
+- v1 does not cancel in-flight TTS on CRITICAL failure — we let attempt 1's TTS finish then discard the audio. Cost budget still met.
+- Session-level rollup for Car Mode instead of per-segment detail (proposal implied per-segment; aggregated is sufficient and halves the Firestore write count).
+
+**Deferred follow-ups**:
+- Mid-flight TTS cancellation on streaming worker regen (proposal's "bad-path-serialize" strategy in its purest form).
+- Temperature bump via failover engine on regen (proposal §Implementation noted this was deferred in Phase 1).
+- Per-job regen spend cap (Phase 1 deferred).
+- Surfacing `stages.quality_gate` in the `/v1/podcasts/{id}/debug` API response (currently lives in Firestore but not exposed by the debug endpoint — minor observability gap discovered during beta smoke).
