@@ -141,7 +141,7 @@ Simple admin page at `/admin/analytics` showing:
 
 ### Acceptance Criteria
 - [ ] All UI strings externalized to messages files
-- [ ] Language selector in user settings
+- [x] Language selector in user settings — frontend PR #489: `/settings/profile` ships a language preference dropdown backed by `language_preference` in `UpdateUserProfileRequest` (R3 Phase 1 schema). Selection persists via PATCH `/v1/me/profile` and surfaces as a default on the Smart Create language picker.
 - [x] Library shows language badges on cards — frontend PR #427: `AudioContentCard` renders a flag + language code pill for non-English items (English suppressed as the 90%+ default). `data-language` attribute also exposed on the card root for future filtering wiring.
 - [x] Library filterable by language — frontend PR #428: `/library?lang=<bcp47>` adds a filter dropdown populated with the languages actually present on the user's items. Initial value comes from `?lang=`, so the filter is deep-linkable. Paired with PR #427's language badge pill.
 - [ ] RTL CSS foundations in place (logical properties)
