@@ -1,6 +1,6 @@
 # R2 — Per-Template Input Coaching (Typing Animation + Richly Detailed Example Per Template)
 
-**Status**: PROPOSED
+**Status**: SHIPPED (2026-04-20) — see Implementation Summary at bottom.
 **Priority**: P1 — highest lever on output quality with the smallest change in user behavior
 **Effort**: ~1 week framework + 1 day per template (parallelizable; ~34 templates)
 **Origin**: Product-owner note, 2026-04-20 drive-test review.
@@ -152,3 +152,30 @@ Direct causal link between input quality and output shape. Disappears once the u
   - `R2-curated-type-examples.md`
   - `R2-rich-input-with-attachments.md`
   - `R3-profile-driven-personalization.md`
+
+---
+
+## Implementation Summary (2026-04-20) — SHIPPED 100%
+
+**Flag**: `feature_template_coaching_live = true` in `lib/feature-flags.ts`. Verified live on beta.kitesforu.com.
+
+**Frontend PRs (kitesforu-frontend)**:
+- `#466` — framework + `lib/typewriter.ts` shared engine + `lib/template-coaching.ts` schema + `IntentSection` consumer + pilot (`concept-deep-dive`).
+- `#467` — batch 1 (6 templates).
+- `#470` — batch 3 (8 templates) + hotfix renaming `employee-onboarding` → `corp-onboarding` (batch 2's entry was keyed on a non-existent template id).
+- `#471` — batch 4 (6 templates) + flipped `feature_template_coaching_live` ON. Coverage crossed the 80% threshold (29/34 ≈ 85%); uncovered templates fall through to the pre-existing placeholder via null-guarded `coaching && …` branches in `IntentSection`, so the remainder ship is graceful degradation with zero regression risk.
+- `#472` — batch 5 (final 5 templates: k12-middle, k12-quick-review, uni-graduate, uni-review, quick-test). **Coverage now 34/34 (100%).**
+
+**Per-template coaching content** came from 34 parallel deep-research agents (one per template), each grounded in real-world exemplars — Pramp/Exponent (interview-prep), Stratechery/Matt Levine (news-digest), Taylor Jenkins Reid / Sally Rooney (romance-drama), NGSS/CCSS/TEKS (K-12), Andy Grove / Julie Zhuo / Brené Brown (corp-leadership), Chomsky/Athey/Vaswani papers (uni-graduate), etc. Each entry is a 300–800-char primary prompt + 2 textured alternates, stamped `version: 1, researchedAt: '2026-04-20'`.
+
+**Verification**: Playwright smoke on beta. Tech Interview showed `"What you'll get: … 25-min coached session drilling tree DP state design and a rate-limiter mock critique."` + "See another example" replay link. Middle School (uncovered at the time of test) correctly fell through to the default placeholder. Screenshots in `.vision_vault/`.
+
+**Deviations from the proposal**:
+- Coverage ramped in 5 batches (pilot + 4 batches) rather than a single content drop; the flag flipped at 85%, with the final 5 templates landing the same day.
+- Typewriter engine lives at `lib/typewriter.ts` (shared module) instead of refactoring the inline `HeroSection` effect — cleaner reuse for the sibling `R2-curated-type-examples` work.
+- No big-box refactor of the home hero yet (in scope for `R2-curated-type-examples`).
+
+**Deferred follow-ups**:
+- Per-user A/B of alternates (proposal §7 mentioned this; deferred until we see per-template engagement data).
+- i18n of exemplary prompts (English-only MVP).
+- Telemetry on "See another example" click-through (trivial to add once we're measuring funnel lift).
