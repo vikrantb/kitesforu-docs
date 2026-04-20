@@ -1,9 +1,32 @@
 # R3 — Share Analytics Creator Loop
 
-**Status**: PROPOSED
+**Status**: DONE — course loop shipped end-to-end. Class / writeup / interview_prep share-stats are deferred (their sharing APIs don't exist yet).
 **Priority**: P2
-**Effort**: ~3 days (API aggregation + frontend badge)
+**Effort**: ~30 minutes actual (down from the ~3 day estimate — the design turned out much simpler than the proposal's "aggregate from analytics event table" path, because no such table exists; counters-on-doc is lighter + lives next to the data).
 **Origin**: 2026-04-19 strategy pass — option #6 (close the sharing feedback loop)
+
+## Implementation summary (2026-04-20)
+
+**Shipped** (2 PRs):
+- `kitesforu-api` PR #244 — `GET /v1/courses/shared/{token}` now fires an `asyncio.create_task(_record_shared_view)` that atomic-increments `shared_view_count` + stamps `shared_last_view_at` on the course doc. New `POST /v1/courses/shared/{token}/track-play` (public) for plays. New `GET /v1/courses/{id}/share-stats` (owner-only via existing service auth) returns `{views, plays, last_view_at, last_play_at}`.
+- `kitesforu-frontend` PR #464 — `lib/api/share-stats.ts` typed client (transport-safe: both helpers return null / swallow errors — share stats are soft signals). `components/sharing/ShareStatsBadge.tsx` (compact pill + full sentence variants, auto-hidden when counters are zero). Library course cards render the compact badge. Shared viewer calls `trackSharedCoursePlay` on episode play.
+
+**Variations from the proposal**:
+- **No analytics event table**: the proposal assumed `shared_content_view` / `shared_content_play` flowed into an aggregation store. Grep of the API repo returned zero matches — those are client-side `console.debug` events today. Rather than build the event pipeline, we put counters directly on the course doc (Firestore atomic `Increment`). Lighter, same read latency, good enough for a vanity metric.
+- **60s cache skipped**: single Firestore read is cheap and the SWR hook on the frontend already dedupes across library renders. Revisit if p50 read latency ever matters.
+- **Share modal receipt + detail-page full sentence**: only the library card badge is wired in v1. `ShareStatsBadge variant="full"` exists and is ready for a one-line drop-in on those surfaces.
+
+**Deferred follow-ups**:
+- Wire full-variant sentence into the course detail page + `ShareContentModal` footer ("You've shared this to N destinations · viewed X times · played Y times").
+- Extend to class / writeup / interview_prep — each needs its own sharing API first; the frontend component is kind-agnostic.
+- Per-recipient / per-episode breakdown (proposal out-of-scope, still out of scope).
+
+**Verification**:
+- CI green on both PRs.
+- Beta listen-through pending by product owner (share a course, view from incognito, confirm counter).
+
+---
+
 
 ## Problem
 
