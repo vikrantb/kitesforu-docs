@@ -1,6 +1,6 @@
 # R2 — Curated Per-Content-Type Example System
 
-**Status**: PROPOSED
+**Status**: SHIPPED MVP (2026-04-20) — see Implementation Summary at bottom.
 **Priority**: P2 (user-visible win on the highest-intent surface)
 **Effort**: Framework ~1 week (1 engineer) + ~1 day/type for canonical prompts (agent-produced; parallelizable)
 **Origin**: 2026-04-19 product-owner review — "under 'say it' we should have a very very very good and well curated example… per type we should have a deep research agent that comes up with that."
@@ -133,3 +133,39 @@ Agents are independent — horror research agent does not see course research ag
 - `components/smart-create/IntentSection.tsx:248-260` — TabToggle: "Say it" / "I have notes" / "Starting points"
 - `lib/templates.ts:1-750` — 34 templates, 8 personas (source for content-type taxonomy)
 - `lib/search-items.ts:24-40` — `classifyInput` keyword routing (interview/podcast/course/writeup/classes)
+
+---
+
+## Implementation Summary — MVP framework slice (2026-04-20)
+
+**Frontend PR**: kitesforu-frontend #473.
+
+**Shipped**:
+- `lib/curated-examples.ts` — `CuratedExample` schema + `CURATED_EXAMPLES` keyed by `ContentType` + `HERO_EXAMPLE_ROTATION` flat list. 10 canonical entries produced by 10 parallel deep-research agents (one per content type: interview-prep, podcast, study-audio, story-series, k12-course, university-course, corporate-training, self-learning, writeup, classes). Each entry carries `version` + `researchedBy` + `researchedAt` for audit + future per-user A/B.
+- `components/home/HeroSection.tsx` + `components/home/CentralChatLauncher.tsx` — both drop the inline `typeNextChar` recursion in favor of the shared `lib/typewriter.ts` engine (already in the tree from R2-template-input-coaching). Each cycle types one full prompt, holds 3.5s, advances to the next type via `onDone`. `prefers-reduced-motion` resolves the full prompt as a ghost; user keystrokes still suppress animation so intent is never clobbered.
+- HeroSection's static "Speak, tap a shortcut, or type it out" helper is replaced (while empty) with `"You'll get: <outcomePreview>"` so the concrete deliverable is visible inline — capability demo at the point of highest attention.
+- `__tests__/lib/curated-examples.test.ts` — 4 shape tests: every `ContentType` has ≥1 example, every example respects the field contract (id slug, prompt length 150–700, outcomePreview ≤200, `researchedBy` prefixed, `researchedAt` ISO date), ids unique across the catalog, rotation covers every type exactly once. Copy itself is intentionally NOT asserted (copy iterates).
+
+**Named scenarios landed in the rotation**:
+- Stripe L5 system design (interview-prep)
+- "AI Agents at Work" Stratechery-voiced explainer (podcast)
+- CS 229 backprop midterm cram (study-audio)
+- Black Hollow, West Virginia 1978 folk-horror serial (story-series)
+- NGSS 3-ESS2 weather-and-climate K-12 unit (k12-course)
+- Yale PHIL 176 Week 3 personal identity with Kagan (university-course)
+- GDPR Article 17 training for support reps w/ mastery gate (corporate-training)
+- Staff-eng comp negotiation w/ Chris-Voss-style drills (self-learning)
+- Stratechery x Benedict Evans AI-platform-shift essay (writeup)
+- Ms. Alvarez 8th-grade cell biology class w/ roster analytics (classes)
+
+**Deviations from the proposal**:
+- Scope is an **MVP framework slice** (proposal §5 framework-only), not the full §4.3 chip-routing overhaul. The bigger UI touches — auto-expand `/create-smart` textarea to `rows=8` when a type is pinned, chip-to-type routing with pinned-type badge + type selector, per-user A/B over rotation order — are tracked as follow-ups.
+- One canonical example per `ContentType` (not 5–10). Catalog is deliberately seeded with one high-quality entry per type so the home hero teaches 10 distinct capabilities at launch; additional variants per type can be appended as research agents produce them (no schema change needed).
+- `CentralChatLauncher` was also refactored to the shared typewriter in the same PR (same inline `typeNextChar` anti-pattern existed there). Keeps both home entry points consistent.
+
+**Deferred follow-ups**:
+- `/create-smart` IntentSection big-box auto-expand when type pinned.
+- Chip-to-type routing (current QUICK_CHIPS are template-based; proposal §4.3 wants them keyed to `ContentType` with a pinned-type badge).
+- Per-user A/B over `HERO_EXAMPLE_ROTATION` order (analytics hook point exists on the schema via `id` + `version`).
+- i18n (English-only MVP).
+- Playwright E2E on beta (proposal §6 AC #9 — verify cycle + `"You'll get:"` subtitle update + keystroke suppression). Type-check + Jest unit tests cover the contract; live smoke deferred.
