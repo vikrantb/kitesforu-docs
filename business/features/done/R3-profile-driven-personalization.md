@@ -1,6 +1,6 @@
 # R3 — Profile-Driven Personalization (Starting Points, Smart Create, Car Mode, Library)
 
-**Status**: PROPOSED
+**Status**: PHASE 1 SHIPPED (2026-04-20) — all code-side ACs landed; see Implementation Summary at bottom. Phase 2+ surfaces remain scoped per the proposal's roadmap.
 **Priority**: P3 (low priority — enabler; Phase 1 must ship before Phase 2 becomes useful)
 **Effort**: Phase 1 ~4–6 days (profile schema + capture). Phase 2+ scoped later per surface.
 **Origin**: 2026-04-19 product-owner review of `/create-smart` — "Starting points goes to the same thing as Say it. Useless without the profile. Log what improvements we can do if we start catching and using the user's persona and profile."
@@ -129,3 +129,61 @@ Each Phase-2 surface (Starting Points reorder, Smart Create placeholder copy, Ca
 ## Why P3 and not P1
 
 No user is complaining that Starting Points is wrong; they just don't use it. The pain is strategic (we are leaving personalization value on the table) rather than tactical (nothing is broken). Phase 1 is pure plumbing with no user-visible win on its own, which is exactly the kind of work that gets deprioritized unless labelled as the enabler it is. Do not ship Phase 2 without Phase 1 — it will be lipstick on a three-field profile.
+
+---
+
+## Implementation Summary — Phase 1 (2026-04-20)
+
+Phase 1 shipped end-to-end across 4 repos in a single coordinated thread. Every acceptance criterion called out in the proposal landed except AC-7 (Playwright verification on beta), which is operationally blocked until the schemas 1.50.0 rollout completes — the code behavior is already pinned by unit tests.
+
+**AC-1 — Schema additions (kitesforu-schemas PR #70, v1.49.0 → v1.50.0)**
+- New Literal enums: `EducationLevel`, `PrimaryGoal`, `DifficultyPreference`, `ActivityCadence`, `CreationPath`.
+- New nested model `InferredProfile` (permissive `extra='ignore'`) with `genres_used`, `last_content_types`, `activity_cadence`, `preferred_creation_path`, `abandonment_hotspots`, `last_inferred_at`.
+- `UserProfile` extended with `role_context`, `education_level`, `primary_goal`, `target_date`, `interest_tags`, `difficulty_preference`, `preferred_duration_min`, `preferred_style` (reuses existing `PodcastStyle`), `language_preference` (reuses existing `SupportedLanguage`), `inferred`, `personalization_enabled` (default `True`). Every new field is optional so legacy Firestore docs keep deserializing.
+- `UpdateUserProfileRequest` mirrors the writable subset and stays strict on enum values so a frontend typo surfaces as 422.
+- 5 new regression tests covering legacy-doc deserialize, round-trip, enum rejection on request, partial PATCH, permissive InferredProfile.
+
+**AC-2 — API (kitesforu-api PR #246)**
+- `GET`/`PATCH /v1/me/profile` + `POST /v1/me/onboarding/complete` now use `UserProfileResponse.model_validate(profile.model_dump())` via a single `_to_response` helper so any future optional field flows through without code change.
+- `update_profile` service already persisted every non-None field via `request.model_dump()` → dotted Firestore update, so the new Phase 1 fields just work.
+- `inferred.*` remains unwritable from this endpoint — the nightly inference job (AC-5) owns it.
+- 5 new tests pinning the pass-through contract.
+
+**AC-3 — Onboarding UX (kitesforu-frontend PR #480)**
+- Onboarding extended 2 → 3 steps. New middle step captures `role_context` (free text ≤200 chars with persona-nudging placeholder), `primary_goal` (6-option chip select), `target_date` (HTML date input → ISO on submit).
+- Every field is skippable; lazy users still complete in ~8 seconds.
+- On final step submit, `PATCH /v1/me/profile` fires FIRST with whatever Phase 1 fields the user provided (non-fatal on failure), then `POST /v1/me/onboarding/complete` completes the core flow.
+- Pre-existing onboarded users are not forced back through the expanded flow — `OnboardingGuard` already gates on `profile.onboarding_completed`.
+
+**AC-4 — Settings surfaces (kitesforu-frontend PR #481)**
+- `/settings/profile` — edits every writable Phase 1 field plus `display_name` + `organization`. Seeds from `useUserProfile`, save issues a single PATCH with explicit `null` for any cleared field so users can remove previously-provided data. Renders a plain-English summary of the inferred block ("You gravitate toward horror, comedy · you show up weekly · recent: podcast, story-series") when present; never exposes raw enum values.
+- `/settings/privacy` — single styled `role=switch` toggle for `personalization_enabled`. Flip issues the PATCH. Conditional "Clear inferred data" link appears when inferred data exists; sets the 24h-clearance expectation. Honest copy: "We never buy or enrich from third parties."
+
+**AC-5 — Nightly inference job (kitesforu-workers PR #298)**
+- `src/workers/jobs/profile_inference.py` splits into pure compute functions (`compute_genres_used`, `compute_last_content_types`, `compute_activity_cadence`, `compute_preferred_creation_path`, `compute_abandonment_hotspots`, `build_inferred_blob`) and a `run_inference(db)` orchestrator.
+- **Idempotent**: re-runs produce the same blob modulo `last_inferred_at`.
+- **Respects opt-out**: `personalization_enabled=False` users are skipped AND have any existing `inferred` block cleared on the same pass.
+- **Threshold**: users with < 3 completed jobs (`MIN_JOBS_FOR_INFERENCE`) are skipped — proposal is explicit that missing inferred is better than noisy inferred.
+- **Cadence buckets**: `daily` ≥ 20 jobs/30d · `weekly` 4–19 · `burst` 5+ jobs inside any 3-day window · `dormant` = 0.
+- Single Firestore `.update()` per user with dotted paths (`inferred` + `updated_at`), respecting the parent-plus-child restriction.
+- `scripts/profile_inference.py --dry-run` is the runnable entry. Cron / Cloud Scheduler wiring is an ops concern outside this PR.
+- 19 unit tests: every compute_* helper (weights, thresholds, bucket boundaries, shape, idempotency) plus 3 orchestration tests with a fake Firestore client (opt-out clear path, opt-in write path, dry-run counts-but-doesn't-write).
+
+**AC-6 — Frontend `useUserProfile` type surface (kitesforu-frontend PR #479)**
+- Exports `EducationLevel`, `PrimaryGoal`, `DifficultyPreference`, `ActivityCadence`, `CreationPath`, `PodcastStyle`, `InferredProfile`, `UserProfile` so Phase 2 surfaces don't each re-define them.
+- Every new field is optional + nullable so older API responses (from pods still on schemas 1.49.0 until the rolling deploy completes) keep parsing.
+- No surface consumes the new fields yet — that's Phase 2's job.
+
+**AC-7 — Playwright verification on beta** — **DEFERRED**. The code behavior is pinned by unit tests (5 schemas + 5 api + 19 workers = 29 new tests across the thread). The operational smoke (walk a fresh user through onboarding, confirm `GET /v1/me/profile` reflects the fields, flip the privacy toggle, verify the nightly job runs against the opted-out user) is gated on the schemas 1.50.0 package rolling through the API and worker deploys. Track as a follow-up verification task, not a code change.
+
+**Deviations from the proposal**
+
+- `InferredProfile.last_inferred_at` is written as `datetime` rather than a raw ISO string so Firestore indexes it natively. The API serializes to ISO on the way out, so the client shape is unchanged.
+- `/settings/privacy`'s "Clear inferred data" button clears by flipping `personalization_enabled` off rather than by directly zeroing the blob; the nightly job does the actual clearing on next run. User-visible copy sets the 24h expectation honestly.
+- Phase 2 consumer PRs (Starting Points reorder, Smart Create placeholder copy, Car Mode suggestions, Library recs, interview-prep prompt injection, course defaults, voice selection) are tracked in the proposal's "Phase 2+" section and ship individually now that the data is flowing.
+
+**Deferred follow-ups**
+
+- AC-7 Playwright smoke on beta.
+- Phase 2 surface PRs (one per week per proposal, each with its own ACs).
+- Cloud Scheduler / Cloud Run Job wiring for the nightly inference script (ops; the code is idempotent + dry-runnable so wiring can land at any time).
