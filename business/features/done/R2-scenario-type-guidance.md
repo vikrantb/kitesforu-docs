@@ -1,11 +1,31 @@
 # R2 — Scenario / Type Guidance UI
 
-**Status**: PROPOSED
+**Status**: DONE (2026-04-20)
 **Priority**: P1
-**Effort**: 2 weeks (1 week research, 1 week implementation)
+**Effort**: Shipped same-day via 9 parallel deep-research agents
 **Affected repos**: kitesforu-frontend, kitesforu-docs
 **Depends on**: R2-template-input-coaching (shipped), R2-curated-type-examples (shipped)
 **Adjacent to**: R2-rich-input-with-attachments.md, R1-phase3-ux-creation-home.md
+
+## Implementation summary
+
+**kitesforu-frontend PR #490** (pilot, 2026-04-20) — shipped the scaffolding (`lib/scenario-guidance.ts` with `deriveScenario()` + `getScenarioGuidance()`), the `feature_scenario_guidance_live` flag (default OFF), analytics events (`scenario_guidance_shown`, `scenario_guidance_hint_clicked`), the textarea bigBox wiring in `IntentSection.tsx` (6 rows when scenario.bigBox), and the schema-hint chip renderer with click-to-expand gloss. Three pilot scenarios populated: **interview-prep** (Stripe L5 backend loop), **skill-mastery** (Rust async Pin / Gjengset), **explainer-podcast** (Odd Lots-style Treasury basis trade). 14 tests. Live on frontend rev 00609.
+
+**kitesforu-frontend PR #491** (batch 2, 2026-04-20) — shipped the remaining 6 scenarios (**storytelling** Shirley Jackson anthology, **k12-lesson** NGSS 5-PS1-1, **writeup** a16z one-pager, **exam-prep** USMLE Step 1 biochem vignettes, **university-lecture** MIT 6.006, **corporate-training** GDPR Art 17 + SCORM/xAPI). All 9 scenarios populated — flag flipped ON in the same PR since the gate (>= 6/9) was clear and the code path is a pure fallback (template-coaching always wins when both are present). 15 tests including the new full-coverage regression guard. Live on frontend rev 00610.
+
+Each scenario's `typedExemplar` was produced by a dedicated `deep-research-agent` with a per-scenario brief grounded in the planner / curriculum-builder / episode-type code that actually consumes the user's free text — the exact "deep research per scenario" gate the proposal set. No synthetic filler; every entry cites real anchors (Stripe L5 loop, Gjengset's "Crust of Rust", Odd Lots, Shirley Jackson, NGSS 5-PS1-1, GitLab 2023 post-mortem, USMLE Step 1, MIT 6.006, GDPR Art 17, Meta 2023 DPC).
+
+## Deviations from the proposal
+
+- **Flag flipped ON in the same PR that completed coverage** rather than deferred to a separate flip-flag PR. The proposal called for flip after 6/9 coverage; we hit 9/9 in one session so there was no intermediate state to dogfood. The code path remains a pure fallback so the flip is low-risk.
+- **Schema-hint chip length capped at 50 chars** (proposal said <= 40). Two scenarios (university-lecture, corporate-training) needed 45–50 char phrasings to avoid losing load-bearing signal. Tightened anyway to avoid chip-wrapping; regression test pins the 50-char ceiling.
+- **Banned-phrase regression guard added in tests** (`comprehensive`, `dive deep into`, `ultimate guide`, `ace your`, `land the job`, `everything you need to know`) — not in the proposal's ACs but load-bearing given the stated copy discipline.
+
+## Deferred follow-ups
+
+- Copy review pass across all 9 entries in 1 week (proposal risk #1 — copy churn)
+- A/B test individual schema-hint phrasings on the existing feature-flag layer once v1 data lands
+- The "structured form inputs (role / company / focus as separate fields)" non-goal stays non-goal — single textarea UX preserved
 
 ---
 
