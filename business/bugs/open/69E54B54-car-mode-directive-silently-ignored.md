@@ -4,11 +4,12 @@
 **Reported**: 2026-04-19 by product owner during live drive-test
 **Priority**: P1 — assistant lies by omission (says yes, does nothing)
 **Surface**: `/car-mode?topic=...` chat mode (voice orchestrator)
-**Fix PRs (4 slices, all merged 2026-04-19)**:
+**Fix PRs (4 slices + SSE filter polish, all merged 2026-04-19/20)**:
 - Slice 1 — kitesforu-frontend #459: intent classifier + curated patter; directives no longer reach the planner.
 - Slice 2 — kitesforu-schemas #68 (`CarModeEditRequest` + `edit_generation`) and kitesforu-api #242 (`POST /v1/car-mode/session/:id/edit`, transactional bump + Pub/Sub publish).
 - Slice 3 — kitesforu-workers #291: `execute_regenerate` truncates segments[from_index:], regenerates with hint threaded into previous-summaries, stamps `edit_generation` on every new segment, marks `edit_request.status='applied'` / `'failed'`.
 - Slice 4 — kitesforu-frontend #460: wire directive path to the edit endpoint, speak patter immediately, fall back to `CAR_MODE_REGEN_FAILED` on error or 409.
+- Polish — kitesforu-frontend #461: client-side `edit_generation` SSE filter. `useDriveSession` tracks `currentEditGenerationRef`; segment_ready events with a lower generation are dropped; higher generation prunes already-buffered episodes ≥ from_index so the regen replaces, not appends. Closes the "stale pre-regen audio briefly plays" window the original deferred list flagged.
 
 **Awaiting**: beta verification on a fresh Car Mode session where the user says a directive like "make this shorter" or "focus on recursion". Move to `closed/` once:
 1. The patter line is spoken immediately.
@@ -17,9 +18,10 @@
 4. Subsequent episode audio reflects the hint.
 
 **Deferred follow-ups (not blocking closure)**:
-- Client-side `edit_generation` filtering on SSE segment events. Without it, stale segments could briefly play before the new ones arrive; acceptable for v1 but should be tightened.
 - Visible regen progress UI (spinner badge) during the in_flight phase.
 - Debounce / coalesce multiple rapid directives into one regen call.
+- Q&A answer language parity (same enhancement Car Mode needs broadly — not regen-specific).
+- ~~Client-side `edit_generation` filtering on SSE segment events.~~ **Shipped in PR #461 (2026-04-20).**
 
 ## Reported symptom (verbatim)
 
