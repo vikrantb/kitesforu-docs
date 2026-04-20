@@ -1,9 +1,29 @@
 # R2 — Quality Auto-Regeneration Loop
 
-**Status**: PROPOSED
+**Status**: PHASE 1 SHIPPED (regular script worker), Phase 2 pending (streaming worker bad-path-serialize)
 **Priority**: P1
 **Effort**: ~1 week (workers only)
 **Origin**: 2026-04-19 strategy pass — highest-leverage option (touches every episode, infrastructure already built)
+
+## Implementation summary (Phase 1 — regular script worker, 2026-04-20)
+
+**Shipped**:
+- `kitesforu-workers` PR #289 — `regen_policy.py` module with `should_regenerate`, `build_regen_hints`, `regen_prompt_preamble`, `bump_temperature`. Critical thresholds 10–15% above the existing warn band. 26 unit tests cover each boundary.
+- `kitesforu-workers` PR #293 — wired into the regular script worker (`stages/script/worker.py`). After `_generate_script` produces a script, `_run_quality_gate_and_maybe_regen` runs the gate; if critical, rebuilds the prompt with imperative hints threaded into `preferences['_custom_instructions']` (zero template change) plus `preferences['_quality_warnings']` for the streaming generator's consumer, then calls `_generate_script` once more. Writes `stages.quality_gate` with `attempt_1_metrics` + `attempt_2_metrics` + `regen_status` ('improved' | 'no_improvement' | 'regen_failed' | 'not_triggered') in a single `.update()` call.
+
+**Variations from the proposal**:
+- **No temperature bump in v1**: the script worker's failover engine picks model + temp internally. Plumbing override requires ~3 additional helper signatures; deferred. Hint threading alone is the primary lever.
+- **Script worker does not read `_quality_warnings` directly** (streaming_generator does). We prepend hints into `_custom_instructions` with `regen_prompt_preamble()` so every script prompt picks it up without template changes.
+- **Cost/temp tracking**: we write `regen_count` + `regen_hints_sent` to Firestore for debug visibility but do not cap per-job regen spend separately yet (v1 trusts the existing `budget_limit` check inside `_generate_script`).
+
+**Phase 2 (pending)**: Streaming worker (`streaming_script_audio_worker.py`) wire-in using the **bad-path-serialize** strategy. The streaming pipeline interleaves LLM + TTS so a clean pre-TTS checkpoint does not exist; the fix is: stream as today, but when the last script chunk closes, run the gate, cancel pending / in-flight TTS tasks on CRITICAL failure, regenerate non-streamingly, then re-run TTS. Substantial architectural change vs. the Phase 1 additive path. Separate PR.
+
+**Deferred follow-ups**:
+- Temperature bump via the failover engine.
+- Per-job regen spend cap.
+- Regen signals for the Car Mode segment worker (third script code path per workers rule #8; currently runs neither the gate nor any regen).
+
+---
 
 ## Problem
 
