@@ -1,9 +1,35 @@
 # R2 — Episode Feedback Capture (Free-text + Thumbs, Web + Car Mode)
 
-**Status**: PROPOSED
+**Status**: DONE — write-path shipped end-to-end (course detail + Car Mode button + Car Mode voice). Read-path is stubbed as proposed; surfacing on creator dashboards is a future follow-up.
 **Priority**: P1 (write-path now, read-path incremental)
-**Effort**: ~3–4 days end-to-end (schemas + API + frontend + Car Mode voice)
+**Effort**: ~2 hours actual (down from the ~3-4 day estimate — the proposal was thorough enough that the implementation was mostly typing)
 **Origin**: Product-owner note, 2026-04-18 drive-test review.
+
+## Implementation summary (2026-04-20)
+
+**Shipped** (4 PRs, all merged):
+- `kitesforu-schemas` PR #69 (v1.49.0) — `EpisodeFeedback` (permissive Firestore read model) + `EpisodeFeedbackRequest` (strict inbound, 200-char note cap, pattern-typed rating / sentiment / source enums).
+- `kitesforu-api` PR #243 — `POST /v1/courses/:id/episodes/:n/feedback` (upsert partial patches, 30/min rate limit, Pydantic 200-char cap, server-side control-char strip, course-existence check). `GET .../feedback/me` for cross-device hydration. Stored under `courses/{id}/episodes/{n}/feedback/{user_id}` — one doc per (user, course, episode), trivial to aggregate later.
+- `kitesforu-frontend` PR #462 — new `lib/api/episode-feedback.ts` typed client; `components/courses/detail/EpisodeFeedback.tsx` rewritten to own its state, hydrate from `.../feedback/me`, and submit partial patches for bucket / thumbs / 200-char note (600ms debounce). Dropped the useless `useState` + prop-drilling in the page.
+- `kitesforu-frontend` PR #463 — Car Mode thumb buttons (left overlay, course-scoped), plus `'like'` / `'dislike'` voice commands with natural-language aliases ("i like this", "thumbs up", "love it", "this is bad", etc.). All Car Mode routes share one `postCarModeFeedbackRef` so `source` attribution is consistent (`car_mode` vs `car_mode_voice`).
+
+**Variations from the proposal**:
+- Free-form topic Car Mode sessions have no persistence target (no `course_id`), so the thumb buttons are hidden there. Proposal didn't require coverage but it's worth calling out — a `session_feedback` store could backfill later.
+- Note submit debounced to 600ms instead of 500ms (proposal said "debounced 500ms") — the extra 100ms noticeably reduced accidental submits on mobile without feeling laggy.
+- Sentiment "clear" affordance is client-only (tapping the same thumb again de-toggles locally). Proposal left this open; adding a server-side clear action was over-engineering for v1.
+
+**Verification**:
+- All PRs CI-green.
+- End-to-end typed path: Pydantic request → Firestore doc → Pydantic read → TypeScript client → React widget.
+- Beta listen-through pending by product owner.
+
+**Deferred (read-path, not blocking closure)**:
+- Creator dashboard summarising feedback per course (feeds into the regen hint loop from bug 69E54B54).
+- Post-hoc moderation batch job reading the sub-collection and flagging abuse — schema is ready but no worker yet.
+- Free-form topic Car Mode feedback target (see Variations above).
+
+---
+
 
 ## Problem
 
