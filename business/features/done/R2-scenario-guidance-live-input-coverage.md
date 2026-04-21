@@ -1,10 +1,37 @@
 # R2 — Scenario Guidance: Live Input Coverage
 
-**Status**: PROPOSED
+**Status**: SHIPPED (moved from proposed/ to done/)
 **Priority**: P1 (user-reported; identified in standing deferred follow-up)
-**Effort**: 1 week
+**Effort**: 1 week estimated; actual ~1 session, 2 frontend PRs
 **Affected repos**: kitesforu-frontend (primary), kitesforu-docs (this)
 **Builds on**: `done/R2-scenario-type-guidance.md` + `done/R2-scenario-guidance-sub-genre-calibration.md` (29 typed sub-genres + typewriter + tick infrastructure)
+
+---
+
+## Implementation summary
+
+Two-PR frontend chain closed all four code deliverables:
+
+| PR | Scope |
+|---|---|
+| `frontend#535` | **D1 + D2** — chip row stays visible while the user types (gate changed from `promptText.length === 0` to `scenario != null`); new pure helper `computeHintCoverageFromInput(entry, userInput)` drives ticks from user input (tokenize label + gloss, intersect with input tokens, named-anchor short-circuit). 8 new unit tests. |
+| `frontend#536` | **D3 + D4** — `coverageMeterCopy(covered, total)` helper + plain-English progress line below the chip row (`"3 of 5 · Strong input — 2 more chips..."`); `trackScenarioCoverageAtSubmit` telemetry fires once per real submission, PII-free. 8 new unit tests. |
+
+**53 total tests** now green in `__tests__/lib/scenario-guidance.test.ts` (37 pre-existing + 16 new across the two PRs).
+
+### Closes end-to-end
+
+- ✅ D1: Chip row stays visible after keystroke 1
+- ✅ D2: Input-driven coverage helper (heuristic, < 1ms/keystroke, zero LLM cost)
+- ✅ D3: Plain-English "3 of 5 — strong input" progress signal
+- ✅ D4: `scenario_coverage_at_submit` telemetry in Cloud Logging
+- 🕒 Phase 5: Threshold calibration from live usage data — **future post-launch tune**, no code action until baseline data lands
+
+### User-visible result
+
+**Before**: chip row vanished at keystroke 1. Teaching signal died at the exact moment a typing user could have benefited from it.
+
+**After**: chips stay visible, tick live as the user types matching vocabulary (e.g. typing "Priya, 4" ticks the "child name + age" chip for the bedtime sub-genre), and a progress line below translates the tick count into plain English. Users see in real time whether their input is dense enough to unlock the planner's strong-output path, and the submit telemetry lets us measure the effect across the cohort.
 
 ---
 
