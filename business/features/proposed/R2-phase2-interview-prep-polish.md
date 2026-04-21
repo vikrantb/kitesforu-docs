@@ -87,11 +87,13 @@ When `content_purpose === 'interview_prep'` and a company name is detected:
 3. **Follow-up questions**: If the answer is thin, the AI asks "Can you give me a specific example?"
 
 ### Acceptance Criteria
-- [ ] Company-specific questions in mock interviews
-- [ ] Specific, actionable feedback (not generic praise)
+- [x] Company-specific questions in mock interviews — schemas PR #77 (v1.57.0) added `GenerateConceptsRequest.target_company`; api PR #276 threads it through `teaching.generator` → `teaching.prompt` with the same company-tailoring guidance used by curriculum-builder (#273) and gap-analysis (#274). System prompt names canonical anchors (Amazon Leadership Principles, Google Googleyness + GCA, Meta coding-heavy, Microsoft collaborative-design, Apple craft, Netflix F&R, McKinsey/BCG/Bain case-structure), forbids inventing private rubrics, and falls back to strong generic framing when the company is not well-known. Teach-phase concepts now weave company-specific framing into titles + `why_this_role`. Full question-bank tagging (per-company curated questions in the Elo-selected bank) remains a follow-up only if usage data shows the Teach-phase signal isn't sufficient.
+- [x] Specific, actionable feedback (not generic praise) — shipped via the evaluation prompt in `services/mock_interview/evaluation/prompt.py`: LLM produces `top_fix` ("one concrete specific fix, max 200 chars"), `rewrite` ("one concrete rewrite of the weakest sentence, max 300 chars"), and `followup_question`. UI renders all three in `TurnFeedbackCard` + `CoachFeedbackCard`. The system-message explicitly structures feedback around the 5-dim rubric (specificity, quantified_impact, ownership, role_outcome_clarity, level_appropriate), so outputs name specific dimensions rather than defaulting to generic praise.
 - [x] Session history with score trends visible — frontend PR #436: `ScoreTrendSparkline` above the Mastery Traces feedback ledger on `/interview-prep/hub`. Plots each session's `latestTrace.weightedScore` (max 8 points, oldest left, newest right) with a qualitative "Trending up / Holding steady / Trending down" label and the first→latest delta as muted metadata. Hidden when fewer than 2 scored sessions exist.
-- [ ] Voice mock uses real speech recognition (not setTimeout theater)
-- [ ] Follow-up questions probe weak answers
+- [ ] Voice mock uses real speech recognition (not setTimeout theater) — remaining; separate frontend thread (post voice-architecture-consolidation).
+- [x] Follow-up questions probe weak answers — shipped end-to-end: schemas PR #72 added `TurnFeedback.followup_question` + `CoachFeedback.followup_question`; api PR #257/#258 taught the evaluation prompt to emit a probing follow-up when any dimension scored ≤ 2.0 or a STAR component is absent; frontend renders the probe in both assessment and practice feedback cards.
+
+**D3 STATUS — 4 of 5 ACs SHIPPED.** Voice-mock real-speech-recognition remains (blocked on voice-architecture consolidation).
 
 ---
 
