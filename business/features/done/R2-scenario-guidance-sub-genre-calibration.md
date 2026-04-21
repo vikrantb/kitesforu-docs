@@ -1,7 +1,48 @@
 # R2 — Scenario / Sub-Genre Guidance Calibration + Live Coverage Ticks
 
-**Status**: PROPOSED
+**Status**: SHIPPED (2026-04-22) — moved from proposed/ to done/
 **Priority**: P1 (quality debt on a shipped feature — user-reported as misleading for ~5 of 9 scenarios)
+
+---
+
+## Implementation summary (2026-04-22)
+
+All three phases of the proposal shipped across 7 frontend PRs. Full sub-genre coverage: **29 of 29 typed sub-genres populated (100%)** across 5 scenarios.
+
+### PRs shipped
+
+| PR | Scope | Count |
+|---|---|---|
+| #499 | storytelling pilot — 4 sub-genres (horror-folk preserved + comedy/romance/bedtime) + sub-genre infra (flat `SUB_GENRE_GUIDANCE` map, `getScenarioGuidance(scenarioId, subGenreId?)` resolver with graceful fallback, chip row UI) | 4 |
+| #500 | Phase 3 — live coverage ticks: `computeTickedHintIndexes(entry, offset): Set<number>` pure-derive helper; chips flip emerald as typewriter passes each hint's `coverageOffset` | infra |
+| #501 | explainer-podcast — 6 sub-genres (business-deep-dive / science / true-crime / history / health / technology) | 6 |
+| #502 | skill-mastery — 5 sub-genres (software-engineering / language-learning / cooking-craft / music-theory / investing-personal-finance) | 5 |
+| #503 | exam-prep — 6 sub-genres (medical-step1 / bar / cfa / standardized / ap-high-school / tech-cert) | 6 |
+| #504 | corporate-training — 5 sub-genres (data-privacy / cybersecurity / dei / manager-onboarding / sales-enablement) | 5 |
+| #505 | storytelling remainder — 3 sub-genres (sci-fi / drama / mystery) — thread closed | 3 |
+
+### Coverage by scenario
+
+- **storytelling** (7 of 7): horror-folk, comedy, romance, bedtime, sci-fi, drama, mystery
+- **explainer-podcast** (6 of 6): business-deep-dive, science, true-crime, history, health, technology
+- **skill-mastery** (5 of 5): software-engineering, language-learning, cooking-craft, music-theory, investing-personal-finance
+- **exam-prep** (6 of 6): medical-step1, bar, cfa, standardized, ap-high-school, tech-cert
+- **corporate-training** (5 of 5): data-privacy, cybersecurity, dei, manager-onboarding, sales-enablement
+
+### Research discipline
+
+Every sub-genre exemplar was produced by a dedicated deep-research agent working back from the actual backend prompt consumption (`kitesforu-workers/src/workers/prompts/content_types/*/*.yaml` or `content_domains/*/*.yaml`), NOT top-down authored. Each agent had texture-differentiation constraints explicit in its brief so sub-genres don't echo each other or sibling entries in other scenarios. Citations are real (named authors, dated research papers, specific incidents, concrete framework clauses).
+
+### Deferred
+
+- **Phase 2 keyword classifier (auto-swap from typing)**: still deferred in favor of manual chip selection. Rationale unchanged — chips give users agency, and we don't yet have data on whether auto-detect is wanted. Can be picked up later as a follow-up proposal.
+
+### Test surface
+
+- **37 unit tests** in `__tests__/lib/scenario-guidance.test.ts` covering shape, banned-buzzword gate, per-scenario populated-list, tick-derive function, and a load-bearing full-offset regression guard: every one of the 29 populated sub-genres reaches 100% coverage by end of its exemplar. If a future copy change breaks this, the test fails the moment a hint becomes unreachable.
+- Live on frontend rev 00622 (as of PR #504 deploy; #505 still deploying at time of write).
+
+---
 **Effort**: 1.5 weeks (Phase 1 research 3–4 days, Phase 2 implementation 3–4 days, Phase 3 ticks 1–2 days)
 **Affected repos**: kitesforu-docs (this), kitesforu-frontend (primary), kitesforu-workers (read-only)
 **Origin**: User report 2026-04-21: "for things like horror/romance/comedy and all that the typing thing in the empty box is not correct. Also even for the others. Think through the proper example... first double check for each thing what do we really need to make the best thing. Work back from the final prompts and experience and topic etc and then [ensure] the examples are correct and appropriate."
