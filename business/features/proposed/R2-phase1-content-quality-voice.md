@@ -111,8 +111,8 @@ The UX redesign (R1) fixes navigation and discovery. R2 fixes the product itself
 
 ### Acceptance Criteria
 - [x] Every new **course** gets a `content_rating` at creation time — schemas PR #73 (v1.53.0) added `ContentRating` enum (G/PG/PG_13/R) + `Course.content_rating` field; api PR #268 wired a deterministic classifier (`services/content_rating.py`) into `create_course`. Covers `course` kind only — classes / writeups / podcasts still pending; follow-up PRs share the same classifier.
-- [ ] Rating flows into system prompts as a content constraint — pending workers PR (bedtime outline_rules.yaml reads `content_rating` and refuses on G violations).
-- [~] Bedtime stories are always rated G (enforced, not suggested) — api #268 classifier **hard-floors BEDTIME style to G** (unconditional, no topic-keyword override path). Workers-side hard refusal on G-violating outlines is the remaining half and ships in a separate PR.
+- [x] Rating flows into system prompts as a content constraint — full chain shipped (schemas #74 → api #269 → course-workers #58 → workers #302). PromptComposer emits per-tier constraint block at priority 105 (immediately after SystemIdentityBuilder) so the LLM sees the rating before any genre / language rules layer on. Silent-when-null for legacy / single-podcast flows.
+- [x] Bedtime stories are always rated G (enforced, not suggested) — end-to-end enforcement shipped: api #268 classifier **hard-floors BEDTIME style to G**; workers #302 `ContentRatingBuilder` hard-collapses any non-G rating to G when `content_type == bedtime` (the worker refuses to lie to the badge). Parental-trust enforcement block emitted on every bedtime prompt. Hard output-validation refusal is an optional post-gen follow-up; prompt-level enforcement is the load-bearing safety mechanism and is shipped.
 - [x] Rating badge visible on library cards — frontend PR #529: `lib/content-rating.ts` helper + `AudioContentCard` renders an emerald/amber/orange/rose pill with dark-mode variants. Silent-when-null so legacy courses render unchanged.
 - [ ] Parental controls option in account settings — pending api endpoint + frontend toggle in `/settings/profile`.
 
