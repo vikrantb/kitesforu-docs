@@ -114,7 +114,9 @@ The UX redesign (R1) fixes navigation and discovery. R2 fixes the product itself
 - [x] Rating flows into system prompts as a content constraint — full chain shipped (schemas #74 → api #269 → course-workers #58 → workers #302). PromptComposer emits per-tier constraint block at priority 105 (immediately after SystemIdentityBuilder) so the LLM sees the rating before any genre / language rules layer on. Silent-when-null for legacy / single-podcast flows.
 - [x] Bedtime stories are always rated G (enforced, not suggested) — end-to-end enforcement shipped: api #268 classifier **hard-floors BEDTIME style to G**; workers #302 `ContentRatingBuilder` hard-collapses any non-G rating to G when `content_type == bedtime` (the worker refuses to lie to the badge). Parental-trust enforcement block emitted on every bedtime prompt. Hard output-validation refusal is an optional post-gen follow-up; prompt-level enforcement is the load-bearing safety mechanism and is shipped.
 - [x] Rating badge visible on library cards — frontend PR #529: `lib/content-rating.ts` helper + `AudioContentCard` renders an emerald/amber/orange/rose pill with dark-mode variants. Silent-when-null so legacy courses render unchanged.
-- [ ] Parental controls option in account settings — pending api endpoint + frontend toggle in `/settings/profile`.
+- [x] Parental controls option in account settings — schemas PR #75 (v1.55.0) added `max_content_rating` to `UserProfile` / `UpdateUserProfileRequest` / `UserProfileResponse`; api PR #270 bumped the dep (route layer auto-forwards the field via generic `_to_response`); frontend PR #530 shipped the dropdown in `/settings/profile` (No filter / G only / Up to PG / Up to PG-13 / Up to R) plus the client-side library filter in `app/library/page.tsx` using `isAllowedByMaxRating(itemRating, maxRating)` helper. Fail-open on unknown / legacy ratings by design so pre-classifier content never silently vanishes behind a filter the user applies later.
+
+**D3 STATUS — ALL 5 ACs SHIPPED.** 10-PR chain complete across 5 repos. See `done/R2-p1-D3-content-rating.md` for the full implementation summary once the rest of R2-p1 ships.
 
 ### Naming note
 
