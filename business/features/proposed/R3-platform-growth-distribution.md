@@ -32,11 +32,11 @@ R1 fixed how users find and navigate. R2 fixed content quality. R3 fixes how the
 - Public access for RSS feed (no auth, but rate-limited)
 
 ### Acceptance Criteria
-- [ ] RSS feed validates against Apple Podcasts validator
-- [ ] Spotify can ingest the RSS feed
-- [ ] Each episode has show notes (auto-generated)
-- [ ] Public podcast page works without sign-in
-- [ ] Creator can customize podcast title, description, artwork for the feed
+- [ ] RSS feed validates against Apple Podcasts validator — **manual QA pending**. The feed structure is RSS 2.0 + iTunes-namespace + content-namespace compliant and the render is covered by 18 unit tests in `kitesforu-api/tests/test_course_rss.py`, but the live Apple Podcasts validator scan has not been run against a populated course yet.
+- [ ] Spotify can ingest the RSS feed — **manual QA pending** (same reason).
+- [x] Each episode has show notes (auto-generated) — kitesforu-api PR #256 emits `<content:encoded>` per `<item>` assembled from existing episode fields: `description` + `objectives` bullet list + `key_topics` inline paragraph. HTML-escaped and CDATA-wrapped with `]]>` defanging. No new LLM call, no schema change. Apple Podcasts, Overcast, Pocket Casts, and Spotify all consume `<content:encoded>` for their show-notes panel. Frontend PR #510 paired: `/listen/{courseId}` public page parses the new field via namespace-agnostic `getElementsByTagNameNS`, converts HTML → plain text client-side (defense-in-depth, no `dangerouslySetInnerHTML`; script/style/iframe/object/embed/img/svg all dropped) and adds a per-episode "Show details" toggle that expands an inline panel with bulleted objectives. 8 new frontend tests in `__tests__/lib/rss-feed-parser.test.ts`. Live on api rev 00500 + frontend rev 00629.
+- [x] Public podcast page works without sign-in — `/listen/{courseId}` in `app/listen/[courseId]/page.tsx` renders anonymously; fetches `/v1/courses/{id}/rss` (public route) and parses XML client-side. Header shows artwork + title + description + Copy-RSS / Apple Podcasts / Overcast / Spotify subscribe links. Episode list has inline Play buttons via `<AudioPlayer>`, a "Show details" toggle for rich show notes (PR #510), and an MP3 Download button per episode (frontend PR #511). Three user actions per episode: play, read notes, download.
+- [x] Creator can customize podcast title, description, artwork for the feed — schemas 1.51.0 added four iTunes-customization fields (`artwork_url`, `author_name`, `author_email`, `explicit`) on `Course`. api PR #248 shipped `PATCH /v1/courses/{id}/settings` with a strict whitelist of editable fields + empty-string-clears-value semantics. frontend `CoursePodcastSettingsModal.tsx` mounted from a "Podcast settings" button in `CourseHeader` edits all 6 creator-facing strings (artwork + author + explicit + title + description).
 
 ---
 
@@ -107,7 +107,7 @@ Simple admin page at `/admin/analytics` showing:
 - Search queries (to inform template creation)
 
 ### Acceptance Criteria
-- [x] All key events tracked — frontend PRs #429–#435. Unified funnel includes `content_created`, `create_abandoned`, `content_completed`, `mock_completed`, `player_action`, `library_filter`, `library_search`, `shared_content_view`, `shared_content_play`, plus navigation events `template_selected` / `persona_selected`. All dispatched from `lib/analytics.ts`.
+- [x] All key events tracked — frontend PRs #429–#435 added the trackers. Unified funnel includes `content_created`, `create_abandoned`, `content_completed`, `mock_completed`, `player_action`, `library_filter`, `library_search`, `shared_content_view`, `shared_content_play`, plus navigation events `template_selected` / `persona_selected`. All dispatched from `lib/analytics.ts`. **PR #506 (2026-04-22) closed the silent-data-loss gap** — before that, `dispatch()` was a no-op in production and every event fired and disappeared. The new `/api/analytics/events` Next.js route accepts the payload, attaches the Clerk `user_id` when available, and emits a single-line structured JSON entry to stdout. Cloud Run forwards stdout to Cloud Logging where each field is queryable under `jsonPayload.event`, `jsonPayload.user_id`, `jsonPayload.props.*`. sendBeacon-primary with fetch-keepalive fallback; all client errors swallowed so analytics never blocks a user interaction. 12 tests (8 existing shape + 4 new pipe).
 - [ ] Analytics dashboard shows daily metrics
 - [x] Creation funnel visible (start → generated → played) — `create_abandoned` (drop-off at intent/plan/question), `content_created` (successful creation), and `content_completed` (natural playback end) together cover the funnel per content type.
 - [x] Audio completion rate measurable by content type — `content_completed` carries `content_type`; `content_created` pairs with the same `content_type`, so completion rate is derivable per type.
