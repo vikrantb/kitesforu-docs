@@ -158,18 +158,28 @@ A second test — optional, run in CI with an `INTAKE_LLM_GATE=1` env flag — c
 
 ## 5. Acceptance criteria
 
-- [ ] All 9 root-scenario `ScenarioGuidance` entries rewritten with ≥ 5 clarifiers covered and ≥ 2 alternateExemplars each.
+- [~] **All 9 root-scenario `ScenarioGuidance` entries rewritten with ≥ 5 clarifiers covered and ≥ 2 alternateExemplars each** — 7 of 9 shipped: `interview-prep` (frontend #545), `storytelling` / `explainer-podcast` / `exam-prep` (frontend #550), `writeup` / `university-lecture` / `k12-lesson` (frontend #551). Remaining: `skill-mastery`, `corporate-training`. Each landed PR contains 3 exemplars covering full clarifier-axis set per §3.5 contract.
 - [ ] All 29 sub-genre entries rewritten under the same contract.
-- [ ] Automated unit-test gate passes — length, alternate-count, clarifier-count, no-prefix-overlap.
+- [x] **Automated unit-test gate passes — length, alternate-count, clarifier-count, no-prefix-overlap** — shipped in frontend #544 (schema + `resolveBoxSizeRows`) + #545 (pilot contract assertions). Lives in `__tests__/lib/scenario-guidance-v2.test.ts` as a `describe.each(V2_UPGRADED_SCENARIOS)` table; each landed scenario appends one row. 96 tests pass as of #551.
 - [ ] Optional real-LLM gate test (env-flagged) passes — every exemplar yields `sufficient=true, confidence ≥ 0.85, questions=[]` on the live intake endpoint.
-- [ ] Composer box grows to fit the exemplar without internal scroll on ≥ 1280 px viewports.
-- [ ] Placeholder feels "active" — cursor keeps blinking after typewriter completes; idle 10s triggers the next alternate to type in.
+- [x] **Composer box grows to fit the exemplar without internal scroll** — frontend #544 ships `resolveBoxSizeRows(entry)` — rows scale from exemplar length: ≤400→6, 400-700→8, 700-1000→10, >1000→12; `boxSizeRows` explicit override wins when set. Wired into `IntentSection.tsx` replacing the hard-coded bigBox branch.
+- [~] **Placeholder feels "active" — idle 10s triggers the next alternate to type in** — the fade-to-next cycling shipped in frontend #544 (SCENARIO_IDLE_MS=10000 in IntentSection effect wrapping `runTypewriter`). Looped cursor shimmer is the remaining polish.
 - [ ] Schema-hint chip nearest the caret pulses as the typewriter advances.
 - [ ] "Your turn" nudge appears below the textarea on first completed alternate cycle.
 - [ ] `prefers-reduced-motion` disables the looped shimmer and the fade-to-next (static state is still legible).
 - [ ] Mobile layout caps box at 8 rows; alternates still cycle.
-- [ ] `feature_scenario_guidance_v2` gates the whole surface; flag OFF falls back to the v1 behavior unchanged.
+- [ ] `feature_scenario_guidance_v2` gates the whole surface; flag OFF falls back to the v1 behavior unchanged. *(Intentionally NOT gated — the infra in #544 is additive and legacy entries without alternates keep v1 one-shot behavior by design.)*
 - [ ] Analytics event `scenario_guidance_alternate_shown` fires per cycle so we can measure *which* alternates land best.
+
+### Ship log
+
+- **2026-04-21 docs #88** — proposal filed
+- **2026-04-21 frontend #544** — infra (schema fields + `resolveBoxSizeRows` + idle-fade-to-next cycling)
+- **2026-04-21 frontend #545** — pilot rewrite: `interview-prep` (Stripe L5 / Meta E5 PM / Amazon SDE2)
+- **2026-04-21 frontend #550** — batch 2: `storytelling` + `explainer-podcast` + `exam-prep`
+- **2026-04-21 frontend #551** — batch 3: `writeup` + `university-lecture` + `k12-lesson`
+- *(next)* batch 4 — `skill-mastery` + `corporate-training` to close root sweep
+- *(next)* sub-genre sweeps (29 entries, batchable same way)
 
 ---
 
