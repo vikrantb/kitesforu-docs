@@ -21,26 +21,28 @@ This document tracks what the audit found and the planned PR sequence to close i
 
 ### HIGH — broken in dark mode, users will notice
 
-- [ ] **Clerk auth modals** — `app/layout.tsx` wraps `<ClerkProvider>` without an `appearance` prop. Sign-in / sign-up / user-button modals render fully white on top of a dark shell. Fix: import `dark` from `@clerk/themes` and bind `appearance={{ baseTheme: resolvedTheme === 'dark' ? dark : undefined }}` via a client wrapper using `next-themes`.
-- [ ] **Interview prep hub** — `app/interview-prep/hub/page.tsx` has ~100 light classes and zero `dark:` variants. Every card, filter pill, empty state, pagination border, and CTA is hard-coded light; the sticky backdrop (`bg-white/85`) and executive Badges will glow against a dark page. Needs a full pass-through dark pass.
-- [ ] **Activity directory sweep** — `components/activity/` (6 files: `ActivityCard.tsx`, `FilterToolbar.tsx`, `SeriesCard.tsx`, `ActiveNowSection.tsx`, `CompactAudioCard.tsx`, `ContentSection.tsx`) are completely undarkened. One systemic PR.
-- [ ] **Public share route — courses** — `app/courses/shared/[token]/page.tsx` has 36 light classes, only 3 `dark:` hits. External invitees on dark OS see a broken view. Decide theme policy: dark-aware or force `data-theme="light"` on the root.
-- [ ] **Public share route — classes** — `app/classes/join/[shareToken]/page.tsx` has 25 light, 0 `dark:`. Same fix direction as the course share route.
-- [ ] **Classes explore/library** — `app/classes/library/page.tsx` has 14 light, 0 `dark:`. Search input, filter selects, empty state, and all course cards are light-only.
-- [ ] **Legacy podcast create form** — `app/courses/create/page.tsx` has 20 light, 0 `dark:`. Style selector cards, persona selector cards, summary rows all light-only. Decide: dark-pass or redirect to `/create-smart` (matching the existing `/create` + `/create2` redirect pattern).
-- [ ] **Signed-in home bottom CTA + ValueCards** — `app/page.tsx:85-134`. The `<section>` with `bg-gradient-to-br from-brand-50 to-brand-100` and the four ValueCards have no dark variants. Fix: `dark:from-brand-500/10 dark:to-brand-500/5 dark:border-brand-500/20` and `dark:bg-zinc-900/60 dark:border-zinc-800 dark:text-zinc-100` on ValueCards.
-- [ ] **Course progress ring stroke** — `components/courses/detail/CourseHeader.tsx:201` uses hardcoded `stroke="#e5e7eb"` (gray-200). The ring track disappears on dark shell. Fix: `stroke="currentColor"` with `className="text-gray-200 dark:text-zinc-800"` on the SVG.
+*Verified 2026-04-21: most HIGH items turned out to be already shipped in prior dark-mode passes, just never marked. Re-audit brought the remaining real gaps down to two (QR rectangle + globals.css utilities).*
+
+- [x] **Clerk auth modals** — shipped via `components/ThemedClerkProvider.tsx`: reads the resolved theme via `useTheme` and pipes a zinc/brand `appearance.variables` map into `ClerkProvider` (zinc-950 background, zinc-50 text, brand-500 accent). Chosen over `@clerk/themes` baseTheme to keep palette consistent with Tailwind tokens without the extra dependency.
+- [x] **Interview prep hub** — `app/interview-prep/hub/page.tsx` now carries 41 `dark:` variants across cards, filter pills, empty state, CTAs (re-audit 2026-04-21).
+- [x] **Activity directory sweep** — 6 of 8 files now carry dark variants (ActivityCard=21, ActiveNowSection=11, FilterToolbar=16, SeriesCard=16, CompactAudioCard=4, ContentSection=4). `ActivityStats.tsx` was the last remaining literal-class file — fixed in the same PR as this doc update. `EmptyState.tsx` intentionally uses semantic tokens (`bg-card`, `text-foreground`, `border-border`) which are theme-aware by design; no `dark:` prefix needed.
+- [x] **Public share route — courses** — `app/courses/shared/[token]/page.tsx` now carries 36 `dark:` variants (re-audit 2026-04-21).
+- [x] **Public share route — classes** — `app/classes/join/[shareToken]/page.tsx` now carries 30 `dark:` variants (re-audit 2026-04-21).
+- [x] **Classes explore/library** — `app/classes/library/page.tsx` now carries 17 `dark:` variants (re-audit 2026-04-21).
+- [x] **Legacy podcast create form** — `app/courses/create/page.tsx` now carries 26 `dark:` variants (re-audit 2026-04-21).
+- [x] **Signed-in home bottom CTA + ValueCards** — `app/page.tsx:85-134` now carries 6 `dark:` variants including the brand-gradient section + the four ValueCards (re-audit 2026-04-21).
+- [x] **Course progress ring stroke** — `components/courses/detail/CourseHeader.tsx` no longer contains `stroke="#e5e7eb"`; the ring uses theme-aware tokens (re-audit 2026-04-21).
 - [ ] **ShareContentModal QR code white rectangle** — `components/ShareContentModal.tsx:681`. QR codes need white backing for scannability, but a bright white block on zinc-950 looks like a bug. Fix: keep `bg-white`, but add a padded container with `dark:bg-zinc-200` or a subtle border/ring so the white block reads as an asset, not a glitch.
 - [ ] **globals.css `@apply` utilities** — `app/globals.css:214-266` has four light-only utility classes (`.form-input-elegant`, `.form-label-elegant`, `.card-elegant`, `.btn-secondary-elegant`) with no `.dark` overrides. Verify references; either delete if unused or add `.dark` rules.
 
 ### MEDIUM — functional but jarring
 
-- [ ] **Top-level error boundary + 404** — `app/not-found.tsx` (2 light, 0 dark) and `app/error.tsx` (3 light, 0 dark). Users hitting errors in dark mode see white-text-on-whiter-background.
-- [ ] **Activity error boundary** — `app/activity/error.tsx` (2 light, 0 dark). Same fix.
+- [x] **Top-level error boundary + 404** — `app/not-found.tsx` now carries 3 `dark:` variants, `app/error.tsx` now carries 6 (re-audit 2026-04-21).
+- [x] **Activity error boundary** — `app/activity/error.tsx` now carries 2 `dark:` variants (re-audit 2026-04-21).
 - [ ] **Create-smart hero** — `app/create-smart/page.tsx:138,144,151,241`. The primary creation flow's `<h1>`, tagline, and "Advanced options" underline link lack dark variants on what is otherwise a dark-aware page.
 - [ ] **CourseHeader residual pockets** — `components/courses/detail/CourseHeader.tsx:94,105,138,166,223,247`. Action buttons, separator bullets `text-gray-300`, metadata line lack dark variants in an otherwise dark-aware file.
-- [ ] **FullPlayer playback-rate button** — `components/AudioPlayer/FullPlayer.tsx:252`. The single light-only control in an otherwise-darkened player.
-- [ ] **BottomNav sign-in label** — `components/BottomNav.tsx:134`. "Sign in" label's `text-gray-500` lacks a dark variant; sibling labels have one.
+- [x] **FullPlayer playback-rate button** — `components/AudioPlayer/FullPlayer.tsx:252` now carries `text-gray-600 dark:text-zinc-300` + dark hover states (re-audit 2026-04-21).
+- [x] **BottomNav sign-in label** — `components/BottomNav.tsx:134` now carries `text-gray-500 dark:text-zinc-400` (re-audit 2026-04-21).
 - [ ] **Shadow system (systemic)** — 77 `shadow-lg`/`shadow-xl`/`shadow-2xl` occurrences across 47 files, **zero** `dark:shadow-*` anywhere. Black translucent shadows on dark surfaces are nearly invisible; bright-styled shadows look muddy. Design-system decision: either add `dark:shadow-black/40` pattern, or replace with `dark:shadow-none dark:ring-1 dark:ring-white/5`. Apply to top ~20 modal / elevated components as one PR.
 - [ ] **Progress page residual pockets** — `app/progress/[jobId]/page.tsx` — 27 light vs 35 dark. Spot-check sweep.
 - [ ] **SignedOutHero forced-dark ambiguity** — `components/home/SignedOutHero.tsx` uses `bg-white/5`/`bg-white/10` opacity variants. If it is intentionally always-dark, make it explicit with a `data-theme="dark"` wrapper.
