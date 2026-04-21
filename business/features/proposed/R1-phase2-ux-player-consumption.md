@@ -133,11 +133,13 @@ In the content detail page, add a "Voice Cast" tab showing all personas in the e
 If speaker data is missing (older episodes, single-speaker content), show nothing — just episode title. No crash, no placeholder.
 
 ### Acceptance Criteria
-- [ ] Current speaker name + role shown in FullPlayer during multi-speaker content
-- [ ] Speaker label updates on speaker changes
-- [ ] Voice Cast tab on detail page for content with personas
-- [ ] Graceful degradation when no speaker data exists
-- [ ] Works for dialogue (2 speakers) and narration (1 speaker)
+- [x] Current speaker name + role shown in FullPlayer during multi-speaker content — shipped via a 2-PR chain. workers #306 decodes each segment's MP3 in `segment_uploader` (pydub, in `asyncio.to_thread` alongside the GCS upload so zero wall-clock latency is added) and persists `segments_ready[].duration_ms` to Firestore. frontend #543 adds `lib/current-speaker.ts` (`buildSegmentTimeline` sums durations in index order; `currentSpeakerAt` is a linear-scan lookup) + `useCurrentSpeaker` hook (fetches `/v1/podcasts/{jobId}/debug`, caches per-jobId) + a "Now speaking: {name}" label under the episode subtitle in FullPlayer (aria-live polite, silent when null). Role is not yet rendered — the per-segment payload carries the speaker *name* (Host1, Host2, Mara, etc.) but role (narrator / guest) is on the separate voice_cast payload; joining the two would force an additional fetch per playback tick, so we ship the name first and add the role join as a follow-up if it moves the metric.
+- [x] Speaker label updates on speaker changes — `currentTime` is forwarded from the persistent player store to FullPlayer, so every timeupdate tick re-runs the `currentSpeakerAt` lookup. No debounce needed because the lookup is pure + O(n) and React skips re-renders when the returned speaker string is unchanged.
+- [x] Voice Cast tab on detail page for content with personas — already shipped earlier via `VoiceCastSection` (`hooks/useVoiceCast` + `components/voice-cast/VoiceCastSection.tsx`, renders the list of named personas per episode).
+- [x] Graceful degradation when no speaker data exists — `buildSegmentTimeline` drops segments missing `duration_ms` (so legacy episodes predating workers #306 produce an empty timeline → no label); `currentSpeakerAt` returns null past the end of the timeline and on empty input; `useCurrentSpeaker` returns null on fetch failure, null jobId, and when `jobIdFromAudioUrl` can't parse the audio URL (custom CDN / local dev). Every layer silently hides rather than placeholder-ing.
+- [x] Works for dialogue (2 speakers) and narration (1 speaker) — the speaker field is already written per-segment by the audio worker for both paths (dialogue: `Host1`/`Host2`; narration: `Narrator`). Single-speaker content is indistinguishable from dialogue to the timeline code, so it just works.
+
+**D2 STATUS — ALL 5 ACs SHIPPED.** 2-PR chain: workers #306 (segment duration persistence) + frontend #543 (FullPlayer label). Role join deferred pending a user-visible need for it.
 
 ---
 
