@@ -158,7 +158,7 @@ Shipped with MPAA-style tiers (**G / PG / PG_13 / R**) instead of the proposal's
 - [ ] Comedy: topicality detection works for current-event humor
 - [ ] Horror: ambient sound layer matches subgenre
 - [ ] Romance: POV switching generates alternate-perspective episodes
-- [ ] Bedtime: energy arc enforcement prevents exciting endings
+- [x] Bedtime: energy arc enforcement prevents exciting endings — shipped end-to-end via a 3-PR chain. workers #303 added `_check_bedtime_energy_arc` to the quality gate with an `_EMOTION_ENERGY_SCORE` map + `_BEDTIME_FORBIDDEN_TAIL_EMOTIONS` set (excited / tense / dramatic / urgent forbidden in the final 30%); workers #304 wired `CRITICAL_BEDTIME_FORBIDDEN_IN_TAIL_COUNT = 1` into `regen_policy.py` so any tail-emotion leak auto-triggers script regeneration with a targeted hint ("Bedtime requires monotonically decreasing energy; rewrite the last third calmer"); workers #305 fixed the load-bearing dead-code bug where the `_derive_types` call site read `AudioConfig.content_type` (a `ContentType` enum with no `bedtime` value) so the gate path never executed in production — replaced with `_derive_types_with_profile_fallback` that promotes umbrella enum values (educational / storytelling / meditation / etc.) to the profile-level genre when `workers.prompts.get_content_type_context` detects `bedtime` / `horror` / `comedy` / `romance` / `drama`. 16 new unit tests pin the narrow-override semantics. Chain is now live on main.
 - [ ] Each genre's quality metric improves measurably
 
 ---
