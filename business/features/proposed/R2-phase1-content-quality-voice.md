@@ -110,11 +110,15 @@ The UX redesign (R1) fixes navigation and discovery. R2 fixes the product itself
 4. **Parental controls**: Optional — parent can set max rating in account settings. Content above the threshold is hidden.
 
 ### Acceptance Criteria
-- [ ] Every new content item gets a `content_rating` at creation time
-- [ ] Rating flows into system prompts as a content constraint
-- [ ] Bedtime stories are always rated G (enforced, not suggested)
-- [ ] Rating badge visible on library cards
-- [ ] Parental controls option in account settings
+- [x] Every new **course** gets a `content_rating` at creation time — schemas PR #73 (v1.53.0) added `ContentRating` enum (G/PG/PG_13/R) + `Course.content_rating` field; api PR #268 wired a deterministic classifier (`services/content_rating.py`) into `create_course`. Covers `course` kind only — classes / writeups / podcasts still pending; follow-up PRs share the same classifier.
+- [ ] Rating flows into system prompts as a content constraint — pending workers PR (bedtime outline_rules.yaml reads `content_rating` and refuses on G violations).
+- [~] Bedtime stories are always rated G (enforced, not suggested) — api #268 classifier **hard-floors BEDTIME style to G** (unconditional, no topic-keyword override path). Workers-side hard refusal on G-violating outlines is the remaining half and ships in a separate PR.
+- [x] Rating badge visible on library cards — frontend PR #529: `lib/content-rating.ts` helper + `AudioContentCard` renders an emerald/amber/orange/rose pill with dark-mode variants. Silent-when-null so legacy courses render unchanged.
+- [ ] Parental controls option in account settings — pending api endpoint + frontend toggle in `/settings/profile`.
+
+### Naming note
+
+Shipped with MPAA-style tiers (**G / PG / PG_13 / R**) instead of the proposal's original ESRB-style (G / PG / T / M / E). MPAA is the more legible taxonomy for a general audience and maps cleanly to iTunes `explicit` for RSS. The `E`-tier (explicit, opt-in) is absorbed into `R` with parental-controls handling the gating. NC-17 is intentionally rejected at the Pydantic boundary.
 
 ---
 
