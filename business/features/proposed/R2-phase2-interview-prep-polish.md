@@ -63,10 +63,12 @@ When `content_purpose === 'interview_prep'` and a company name is detected:
 3. The script should reference the company by name and use real examples
 
 ### Acceptance Criteria
-- [ ] Content for "Google PM interview" mentions Google-specific values (Googleyness, impact)
-- [ ] Content references recent company events (< 30 days old)
-- [ ] Content uses the company's actual interview format (e.g., Amazon's LP-based structure)
-- [ ] Fallback gracefully if company not recognized (generic but high-quality)
+- [x] Content for "Google PM interview" mentions Google-specific values (Googleyness, impact) — api PR #273 (curriculum-builder) + PR #274 (gap-analysis) add explicit "Company-specific tailoring" rules to the system prompt with canonical anchors (Amazon LPs, Google Googleyness + GCA, Meta coding-heavy, Microsoft collaborative-design, Apple craft, Netflix F&R, McKinsey/BCG/Bain case structure). Both LLM paths (gap cards → curriculum episode titles → workers composer) now weave these cues naturally.
+- [x] Content references recent company events (< 30 days old) — api PR #275 adds `services/interview_prep/company_research.py` (Tavily-backed, 5s hard timeout, top-3 + 400-char cap, NEVER-RAISES contract). Both gap_analysis and curriculum_builder await `fetch_recent_events(target_company_name)` before the LLM call and render a "RECENT COMPANY CONTEXT (last 30 days)" prompt block with a "never invent detail beyond what is cited here" scope directive. 12 new tests cover every failure mode (missing key / HTTP error / timeout / malformed body / empty results) + happy path + prompt shape. **Requires `TAVILY_API_KEY` in Cloud Run secrets to activate**; unset → returns None → training-data-only behavior preserved (AC not regressed).
+- [x] Content uses the company's actual interview format (e.g., Amazon's LP-based structure) — same PR #273/#274 anchor list explicitly names the public interview formats; prompt prefers "Walk through a 'Deliver Results' STAR for Amazon" over generic behavioral framing when target is Amazon.
+- [x] Fallback gracefully if company not recognized (generic but high-quality) — shipped end-to-end across all three paths: prompt clause ("If target company is not well-known, fall back to strong generic structure — do not guess"), company_research silent-None on Tavily failure, NEVER-invent clause prevents LLM from inventing company facts.
+
+**D2 STATUS — ALL 4 ACs SHIPPED.** Three-PR chain complete: api #273 (curriculum-builder prompt) + #274 (gap-analysis prompt) + #275 (recent-events research step).
 
 ---
 
