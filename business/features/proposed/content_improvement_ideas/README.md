@@ -58,6 +58,26 @@ The initial prioritization is based on a blend of:
 - `04-corporate-training-and-team-communication-content-ideas.md`
 - `05-storytelling-content-ideas.md`
 - `06-cross-cutting-content-principles.md`
+- `07-user-jobs-and-subcases.md`
+- `08-concrete-idea-bank.md`
+- `09-content-assembly-and-podcast-craft.md`
+- `10-future-content-wishlist.md`
+
+## If someone needs to review or rank ideas quickly
+
+Start with:
+
+1. `07-user-jobs-and-subcases.md`
+2. `08-concrete-idea-bank.md`
+3. `09-content-assembly-and-podcast-craft.md`
+4. `10-future-content-wishlist.md`
+
+Those four files are the most decision-oriented part of the package:
+
+- what users are actually trying to get done
+- what concrete content patterns could help
+- how the content should be assembled
+- what missing scope may deserve future exploration
 
 ## High-level thesis
 
