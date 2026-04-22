@@ -83,6 +83,7 @@ Those four files are the most decision-oriented part of the package:
 Then go scenario by scenario into the deep dives:
 
 - `11-interview-prep-deep-dive.md`
+- `12-exam-prep-deep-dive.md`
 
 ## High-level thesis
 
