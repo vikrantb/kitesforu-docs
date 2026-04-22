@@ -62,6 +62,7 @@ The initial prioritization is based on a blend of:
 - `08-concrete-idea-bank.md`
 - `09-content-assembly-and-podcast-craft.md`
 - `10-future-content-wishlist.md`
+- `11-interview-prep-deep-dive.md`
 
 ## If someone needs to review or rank ideas quickly
 
@@ -78,6 +79,10 @@ Those four files are the most decision-oriented part of the package:
 - what concrete content patterns could help
 - how the content should be assembled
 - what missing scope may deserve future exploration
+
+Then go scenario by scenario into the deep dives:
+
+- `11-interview-prep-deep-dive.md`
 
 ## High-level thesis
 
