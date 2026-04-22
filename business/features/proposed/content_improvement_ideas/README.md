@@ -51,6 +51,7 @@ The initial prioritization is based on a blend of:
 
 ## Files
 
+- `00-original-content-theory.md`
 - `01-interview-prep-content-ideas.md`
 - `02-exam-prep-and-skill-mastery-content-ideas.md`
 - `03-teaching-explainer-and-lecture-content-ideas.md`
