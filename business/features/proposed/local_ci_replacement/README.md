@@ -228,7 +228,7 @@ The 4-agent pass was strong but has tensions to resolve:
 ## 9. Ship log
 
 - **2026-04-22 docs this proposal** — synthesis of 4-agent deep-research pass
-- *(next)* frontend Phase 1 implementation PR
+- **2026-04-22 frontend Phase 1 SHIPPED** (frontend PR #581) — `.claude/settings.json` canonical hook path, husky + lint-staged, `scripts/ci/pre-push-frontend.sh` + `local-ci.sh` + `post-edit-check.sh`, `quality_gates_rollback` gate with `workflow_dispatch.run_full_suite` input. Live pre-push on the shipping commit itself ran in 1s. Sibling Python repos (api #282, workers #312, course-workers #59, schemas #78) already carry the env-flag half of this pattern; Phase 2 will port the Claude-hooks + pre-push-script layer to those repos.
 - *(next)* api Phase 2 + workers Phase 2 implementation PRs
 - *(next)* course-workers / schemas / infrastructure Phase 3 polish PRs
 - *(next)* Phase 4 AST-invariant hooks rollout
