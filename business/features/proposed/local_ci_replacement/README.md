@@ -217,6 +217,26 @@ The local process should do more than current CI in these ways:
 - make version bump rules local for publishable packages
 - keep escape hatches explicit: `git commit --no-verify` or `git push --no-verify`
 
+## Per-change ownership rule
+
+Any meaningful change should be thought through across the whole path, not only inside the edited code:
+
+- what should be caught immediately after edit
+- what should be enforced at stop time
+- what should be enforced at `pre-commit`
+- what should be enforced at `pre-push`
+- what GitHub CI still needs to do
+- what still has to happen safely at deploy / apply / publish time
+
+This matters because the right implementation is often not just "change app code." It may also require:
+
+- updating repo-local hook behavior
+- adjusting the lightweight GitHub workflow
+- changing deploy verification or publish checks
+- tightening versioning / packaging / infra safeguards
+
+The owner mindset here is: every important change should leave the code path, the validation path, and the rollout path in a coherent state.
+
 ## Brainstorm / Claude follow-up still needed
 
 This proposal is intentionally implementation-oriented, but it still needs a stronger second pass with deeper research and critique before the final rollout is declared complete.
