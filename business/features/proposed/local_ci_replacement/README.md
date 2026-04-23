@@ -179,6 +179,7 @@ Strong gate:
 - all of the above
 - `mypy src/kitesforu_schemas --ignore-missing-imports`
 - fail locally if `src/` changes without a version bump
+- because the broad type baseline is still red today, `pre-push` should enforce the fast gate and leave `./scripts/local-ci.sh full` as an explicit audit command until the type debt is fixed
 
 ### Infrastructure
 
@@ -232,7 +233,8 @@ That follow-up should answer:
 
 - `kitesforu-api`: the broad test suite currently has multiple red tests, including `tests/test_activity.py::TestFetchPodcasts::test_returns_items_with_inputs` (`/progress/pod1` vs `/studio/pod1`) and `tests/test_api_allow_premium.py::TestAPIAllowPremium::test_minimum_duration_validation`. The local full gate remains an audit command; `pre-push` enforces the fast deterministic gate until the suite is repaired.
 - `kitesforu-course-workers`: the broad suite currently has multiple red tests, including the OpenAI-key path in `tests/integration/test_course_pipeline.py::TestCoursePipelineIntegration::test_syllabus_generates_curriculum` and an expectation mismatch in `tests/unit/test_class_workers.py::TestClassInitiatorWorker::test_validate_input_missing_grade_level`. The local full gate remains an audit command; `pre-push` enforces the fast deterministic gate until the suite is repaired.
-- `kitesforu-workers`, `kitesforu-schemas`, and `kitesforu-infrastructure`: the current local full gate ran successfully in this rollout.
+- `kitesforu-workers` and `kitesforu-infrastructure`: the current local full gate ran successfully in this rollout.
+- `kitesforu-schemas`: the test and compile portions of the full gate are green, but the repo still has baseline mypy failures in `src/kitesforu_schemas/duration.py` and `src/kitesforu_schemas/models.py`. The local full gate remains an audit command; `pre-push` enforces the fast deterministic gate until the type baseline is repaired.
 
 These carve-outs are not meant to become permanent. They exist so the local-CI replacement can go live without pretending the baseline is cleaner than it is.
 
