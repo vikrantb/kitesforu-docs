@@ -1,5 +1,15 @@
 # Content Improvement Ideas
 
+## Status
+
+This folder is still in active proposal / brainstorm mode.
+
+Current rule:
+
+- the deep-dive files here are meant to be reviewed, critiqued, and strengthened further
+- Claude should treat them as inputs for a serious brainstorm and prioritization pass, not as final truth
+- after the current in-flight implementation work is done, these should be taken up scenario by scenario for deeper critique, scoring, merging, and prioritization
+
 ## Purpose
 
 This folder is for a content-first strategy pass:

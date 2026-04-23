@@ -1,5 +1,16 @@
 # Exam Prep Deep Dive
 
+## Status
+
+This is a proposal-stage deep dive.
+
+It still needs:
+
+- a serious Claude critique / brainstorm pass
+- idea scoring and pruning
+- merging of overlaps
+- a final shortlist after challenge, not before
+
 This is the second scenario-specific deep dive.
 
 The goal is to identify:
