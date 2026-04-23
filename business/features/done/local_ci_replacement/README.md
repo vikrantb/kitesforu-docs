@@ -1,6 +1,6 @@
 # Local CI Replacement — Trust Local, Ship Fast
 
-**Status**: PROPOSED
+**Status**: SHIPPED (Phase 1-3 merged across 6 repos 2026-04-22/23) — Phase 4 (AST-invariant hooks) deferred
 **Priority**: P0 (infra)
 **Affected repos**: all 6 (kitesforu-frontend, kitesforu-api, kitesforu-workers, kitesforu-course-workers, kitesforu-schemas, kitesforu-infrastructure)
 **Owner directive**: "local CI should cover everything GitHub CI covers and do more where it matters… once the local path is strong enough, GitHub CI should become lightweight and mostly just push to prod/publish/apply."
@@ -228,10 +228,9 @@ The 4-agent pass was strong but has tensions to resolve:
 ## 9. Ship log
 
 - **2026-04-22 docs this proposal** — synthesis of 4-agent deep-research pass
-- **2026-04-22 frontend Phase 1 SHIPPED** (frontend PR #581) — `.claude/settings.json` canonical hook path, husky + lint-staged, `scripts/ci/pre-push-frontend.sh` + `local-ci.sh` + `post-edit-check.sh`, `quality_gates_rollback` gate with `workflow_dispatch.run_full_suite` input. Live pre-push on the shipping commit itself ran in 1s. Sibling Python repos (api #282, workers #312, course-workers #59, schemas #78) already carry the env-flag half of this pattern; Phase 2 will port the Claude-hooks + pre-push-script layer to those repos.
-- *(next)* api Phase 2 + workers Phase 2 implementation PRs
-- *(next)* course-workers / schemas / infrastructure Phase 3 polish PRs
-- *(next)* Phase 4 AST-invariant hooks rollout
+- **2026-04-22 frontend Phase 1 SHIPPED** (frontend PR #581) — `.claude/settings.json` canonical hook path, husky + lint-staged, `scripts/ci/pre-push-frontend.sh` + `local-ci.sh` + `post-edit-check.sh`, `quality_gates_rollback` gate with `workflow_dispatch.run_full_suite` input. Live pre-push on the shipping commit itself ran in 1s.
+- **2026-04-22/23 Phase 2 + 3 SHIPPED across 5 Python/Terraform repos** — api PR #282 (incl. dep_sync guard that stays CI-mandatory for `requirements.txt↔pyproject.toml` drift), workers PR #312, course-workers PR #59, schemas PR #78, infrastructure PR #40. Each repo has `.claude/settings.json` (PreToolUse branch guard, PostToolUse post-edit-check, Stop local-ci, SessionStart git-status), `.githooks/pre-commit` + `.githooks/pre-push`, `scripts/local-ci.sh` + `scripts/post-edit-check.sh` + `scripts/setup-local-ci.sh`. CI tests/lint/typecheck gated behind `LOCAL_CI_OWNS_QUALITY_GATES='true'`; build-and-deploy path preserved on main.
+- *(next, deferred)* Phase 4 AST-invariant hooks — pydantic-firestore ConfigDict check, SupportedLanguage cast enforcement, duration-float check, Dockerfile-COPY verify for new top-level dirs. Ship after Phase 1-3 plumbing is observed stable in practice; the MEMORY.md outage classes these prevent are the real motivator.
 
 ## 10. Sources
 
