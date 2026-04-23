@@ -158,18 +158,18 @@ A second test — optional, run in CI with an `INTAKE_LLM_GATE=1` env flag — c
 
 ## 5. Acceptance criteria
 
-- [~] **All 9 root-scenario `ScenarioGuidance` entries rewritten with ≥ 5 clarifiers covered and ≥ 2 alternateExemplars each** — 7 of 9 shipped: `interview-prep` (frontend #545), `storytelling` / `explainer-podcast` / `exam-prep` (frontend #550), `writeup` / `university-lecture` / `k12-lesson` (frontend #551). Remaining: `skill-mastery`, `corporate-training`. Each landed PR contains 3 exemplars covering full clarifier-axis set per §3.5 contract.
-- [ ] All 29 sub-genre entries rewritten under the same contract.
-- [x] **Automated unit-test gate passes — length, alternate-count, clarifier-count, no-prefix-overlap** — shipped in frontend #544 (schema + `resolveBoxSizeRows`) + #545 (pilot contract assertions). Lives in `__tests__/lib/scenario-guidance-v2.test.ts` as a `describe.each(V2_UPGRADED_SCENARIOS)` table; each landed scenario appends one row. 96 tests pass as of #551.
+- [x] **All 9 root-scenario `ScenarioGuidance` entries rewritten with ≥ 5 clarifiers covered and ≥ 2 alternateExemplars each** — complete: `interview-prep` (frontend #545), `storytelling` / `explainer-podcast` / `exam-prep` (frontend #550), `writeup` / `university-lecture` / `k12-lesson` (frontend #551), `skill-mastery` + `corporate-training` (shipped as part of the same v2 sweep — both land v2 schema fields + `alternateExemplars.length ≥ 2` + `clarifiersCovered.length = 7` and are registered in the `V2_UPGRADED_SCENARIOS` gate table). Each landed PR contains 3 exemplars covering full clarifier-axis set per §3.5 contract.
+- [ ] All 29 sub-genre entries rewritten under the same contract. *(3 registered in `V2_UPGRADED_SUB_GENRES` gate table: `storytelling/horror-folk`, `skill-mastery/software-engineering`, `corporate-training/cybersecurity`. 26 remaining — batchable same way as the root sweep.)*
+- [x] **Automated unit-test gate passes — length, alternate-count, clarifier-count, no-prefix-overlap** — shipped in frontend #544 (schema + `resolveBoxSizeRows`) + #545 (pilot contract assertions). Lives in `__tests__/lib/scenario-guidance-v2.test.ts` as a `describe.each(V2_UPGRADED_SCENARIOS)` table; each landed scenario appends one row. 156 tests pass.
 - [ ] Optional real-LLM gate test (env-flagged) passes — every exemplar yields `sufficient=true, confidence ≥ 0.85, questions=[]` on the live intake endpoint.
 - [x] **Composer box grows to fit the exemplar without internal scroll** — frontend #544 ships `resolveBoxSizeRows(entry)` — rows scale from exemplar length: ≤400→6, 400-700→8, 700-1000→10, >1000→12; `boxSizeRows` explicit override wins when set. Wired into `IntentSection.tsx` replacing the hard-coded bigBox branch.
-- [~] **Placeholder feels "active" — idle 10s triggers the next alternate to type in** — the fade-to-next cycling shipped in frontend #544 (SCENARIO_IDLE_MS=10000 in IntentSection effect wrapping `runTypewriter`). Looped cursor shimmer is the remaining polish.
-- [ ] Schema-hint chip nearest the caret pulses as the typewriter advances.
-- [ ] "Your turn" nudge appears below the textarea on first completed alternate cycle.
-- [ ] `prefers-reduced-motion` disables the looped shimmer and the fade-to-next (static state is still legible).
-- [ ] Mobile layout caps box at 8 rows; alternates still cycle.
+- [~] **Placeholder feels "active" — idle 10s triggers the next alternate to type in** — the fade-to-next cycling shipped in frontend #544 (SCENARIO_IDLE_MS=10000 in IntentSection effect wrapping `runTypewriter`). Looped cursor shimmer is the remaining polish (deferred — needs placeholder-overlay refactor because `<textarea>` placeholders don't support per-character animation).
+- [x] **Schema-hint chip nearest the caret pulses as the typewriter advances** — frontend #564. Computes `pulsingHintIndex` each render as the smallest `coverageOffset > coachedPlaceholder.length`; applies `animate-pulse + ring-brand-300/70` on that single chip. Disabled when the user types and under `prefers-reduced-motion`.
+- [x] **"Your turn" nudge appears below the textarea on first completed alternate cycle** — frontend #563: `hasTypedFullExemplar` flips true in the typewriter's `onDone`; the nudge renders on `scenario && !coaching && hasTypedFullExemplar && promptText.length === 0` and disappears the moment a key is pressed. `aria-live="polite"` so screen readers announce the handoff.
+- [~] `prefers-reduced-motion` disables the looped shimmer and the fade-to-next (static state is still legible). — partial: `prefers-reduced-motion` already resolves the typewriter to the full target string (skipping the char-by-char animation) and frontend #564 extends it to also disable the chip pulse. The idle-fade-to-next cycling still fires under reduced-motion; deferred as a follow-up since the cycling is a content change, not a motion effect.
+- [x] **Mobile layout caps box at 8 rows; alternates still cycle** — frontend #564: `matchMedia('(max-width: 767px)')` listener drives `isNarrowViewport`; `rows` is clamped to `min(resolved, 8)` when true. Listener is subscribed so rotation triggers a reflow.
 - [ ] `feature_scenario_guidance_v2` gates the whole surface; flag OFF falls back to the v1 behavior unchanged. *(Intentionally NOT gated — the infra in #544 is additive and legacy entries without alternates keep v1 one-shot behavior by design.)*
-- [ ] Analytics event `scenario_guidance_alternate_shown` fires per cycle so we can measure *which* alternates land best.
+- [x] **Analytics event `scenario_guidance_alternate_shown` fires per cycle** — frontend #564. Also adds `scenario_guidance_your_turn_shown` (once per scenario render when the nudge first appears). Both payloads carry `scenario_id` + `sub_genre_id` + (for alternate) `alternate_index`. Paired with `content_created`, these drive the proposal's rollout-guard decision (drop cycling if `your_turn_shown > 30%` without a matching creation).
 
 ### Ship log
 
@@ -178,8 +178,12 @@ A second test — optional, run in CI with an `INTAKE_LLM_GATE=1` env flag — c
 - **2026-04-21 frontend #545** — pilot rewrite: `interview-prep` (Stripe L5 / Meta E5 PM / Amazon SDE2)
 - **2026-04-21 frontend #550** — batch 2: `storytelling` + `explainer-podcast` + `exam-prep`
 - **2026-04-21 frontend #551** — batch 3: `writeup` + `university-lecture` + `k12-lesson`
-- *(next)* batch 4 — `skill-mastery` + `corporate-training` to close root sweep
-- *(next)* sub-genre sweeps (29 entries, batchable same way)
+- **2026-04-21 frontend (root-sweep close)** — `skill-mastery` + `corporate-training` landed as part of the v2 sweep (both in `V2_UPGRADED_SCENARIOS` gate table, 7-clarifier contract, 3 exemplars each).
+- **2026-04-21 frontend #563** — Phase C: "Your turn" nudge after first exemplar
+- **2026-04-21 frontend #564** — Phase C: chip pulse + mobile 8-row cap + `alternate_shown` / `your_turn_shown` analytics
+- *(next)* sub-genre v2 sweep — 26 entries remaining, batchable same way as the root sweep
+- *(next, optional)* placeholder-overlay refactor to land the looped caret shimmer
+- *(next, optional)* env-flagged real-LLM gate test per §4 Phase B
 
 ---
 
