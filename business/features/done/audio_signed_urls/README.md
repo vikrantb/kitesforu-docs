@@ -102,10 +102,17 @@ Rollback strategy: every PR is a single env-gated flag away from a no-op. PR 1 (
 ## 8. Ship log
 
 - **2026-04-24 docs this proposal** — capture decisions, scope, rollout
-- *(next)* PR 1 api — re-sign endpoint + shared signing helper extraction
-- *(next)* PR 2 workers — segment_uploader signed-URL switch + gcs_path field
-- *(next)* PR 3 frontend — audio hook calls re-sign endpoint on 403 / age > 7d
-- *(next)* beta Playwright verification
+- **2026-04-24 api #286** — PR 1: `GET /v1/podcasts/{job_id}/segments/{segment_index}/audio-url` re-sign endpoint + shared `signed_url.py` helper (V4 signing + SSRF-safe `gcs_path` resolver). Extracted from `workers/common/debug_artifacts.py`. Auth'd with same user-ownership check as `/v1/podcasts/*`.
+- **2026-04-24 workers #315** — PR 2: `segment_uploader.py` writes V4 7-day signed `audio_url` + new `gcs_path` field to every new segment record. Sibling `sign_segment_url(blob, ttl_days)` helper returns `Optional[str]` and never raises; signing failures degrade to the existing public URL with a structured warn log. No pipeline crash path.
+- **2026-04-24 frontend #586** — PR 3a: `useAudioPlayer` gained `attemptResignRetry` + `resignedEpisodeIdsRef` (one-shot per episode) + `lib/audio-url-resign.ts` helper + 24 unit tests. `AudioEpisode` now optionally carries `jobId` + `segmentIndex`. Retry fires on 403 / `MediaError.MEDIA_ERR_NETWORK|SRC_NOT_SUPPORTED` / `src contains storage.googleapis.com` + URL >24h old.
+- **2026-04-24 frontend #587** — PR 3b: StudioPlayer opts into the re-sign path by threading `jobId` + `segmentIndex` into each streamed AudioEpisode from the SSE segments.
+- **2026-04-24 beta Playwright verification** — studio + library playback silently self-heal stale signed URLs under manual 403 simulation (dev-flag). Rollout gated behind `feature_audio_resign`.
+
+### Status — 2026-04-24
+
+**DONE** — studio + library podcast playback covered end-to-end.
+
+**Deferred as Layer 5b** — **car-mode drive player**: uses the same `useAudioPlayer` hook but (a) `useDriveEpisodes` does not thread `jobId`/`segmentIndex` onto AudioEpisode objects and (b) car-mode brainstorm audio lives in the `car_mode_sessions` Firestore collection, not `podcast_jobs` — so the existing `/v1/podcasts/{job_id}/...` re-sign endpoint cannot resolve it. A separate proposal (`car_mode_audio_resign/README.md`) scopes the 3-repo fix. Car-mode playback of EXISTING course/podcast audio still works via the shipped path, because those segments live under `podcast_jobs`; only fresh car-mode brainstorm sessions remain uncovered.
 
 ## 9. Sources
 
