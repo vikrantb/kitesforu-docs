@@ -8,19 +8,43 @@
 
 ## TL;DR
 
-```bash
-# Flip 1 (cost): enables Anthropic prompt caching in streaming + non-streaming paths
-gcloud run services update kitesforu-worker-audio \
-  --region=us-central1 \
-  --update-env-vars=ENABLE_ANTHROPIC_PROMPT_CACHING=true
+Loop over every LLM-calling Cloud Run service and apply both flags in one command each. The canonical service names come from `kitesforu-workers/.github/workflows/ci.yml::SERVICES` — do NOT paraphrase them (e.g., `kitesforu-worker-research` would error; the actual service is `kitesforu-worker-research-planner`).
 
-# Flip 2 (quality): enables episode_type classifier + full cascade
-gcloud run services update kitesforu-worker-audio \
-  --region=us-central1 \
-  --update-env-vars=ENABLE_EPISODE_TYPE_CLASSIFIER=true
+```bash
+REGION=us-central1
+
+for SERVICE in \
+    kitesforu-worker-audio \
+    kitesforu-worker-script \
+    kitesforu-worker-research-planner \
+    kitesforu-worker-research-assimilator \
+    kitesforu-worker-tools \
+    kitesforu-worker-planner \
+    kitesforu-worker-car-mode \
+    kitesforu-worker-course-initiate \
+    kitesforu-worker-course-syllabus \
+    kitesforu-worker-course-orchestrate ; do
+  gcloud run services update "$SERVICE" \
+    --region="$REGION" \
+    --update-env-vars=ENABLE_ANTHROPIC_PROMPT_CACHING=true,ENABLE_EPISODE_TYPE_CLASSIFIER=true
+done
 ```
 
-**Apply the same flips** to `kitesforu-worker-script` and `kitesforu-worker-research` / `kitesforu-worker-research-assimilator` / `kitesforu-worker-tools` / `kitesforu-worker-planner` to cover all 5 LLM-calling stages the cache-telemetry was wired into (#351).
+**Service scope rationale** (10 services, covers every place either flag has effect):
+
+| Service                                | Why                                                   |
+|:---------------------------------------|:------------------------------------------------------|
+| `kitesforu-worker-audio`               | Runs `StreamingScriptAudioWorker` — PRIMARY streaming path (90%+ of fiction users) |
+| `kitesforu-worker-script`              | `ScriptWorker` — secondary non-streaming path         |
+| `kitesforu-worker-research-planner`    | `ResearchPlannerWorker` — LLM calls for research queries (cache telemetry wired in #351) |
+| `kitesforu-worker-research-assimilator`| `AssimilatorWorker` — LLM synthesis (cache telemetry wired in #351) |
+| `kitesforu-worker-tools`               | `ToolsWorker` + agentic planner/synthesizer (cache telemetry wired in #351) |
+| `kitesforu-worker-planner`             | `PlannerWorker` — outline LLM (cache telemetry wired in #351) |
+| `kitesforu-worker-car-mode`            | Car Mode segment streaming — LLM calls via the same provider layer; benefits from caching even though its gate path hardcodes `episode_type=""` per #352 |
+| `kitesforu-worker-course-*` (3 services)| Course pipeline workers — may make LLM calls; setting the flag is safe (default-off if never read) and future-proofs if/when cache telemetry extends there |
+| `kitesforu-worker-initiator`           | Intentionally **excluded** — no LLM calls today, just Pub/Sub fan-out |
+
+If you prefer to limit scope, the MINIMUM set is `audio + script + research-planner + research-assimilator + tools + planner` (6 services — the ones with #351 cache-telemetry wiring today). Adding `car-mode + course-*` costs nothing (the env var is silently unused until the worker reads it) but avoids having to redeploy later when cache telemetry extends to those stages.
 
 **Projected impact** (per `unit_economics_tracking/README.md`):
 - Flip 1: ~$2.0–3.4k/mo savings at 1k fiction ep/day (78% of prompt tokens cacheable, 90% discount on cache reads)
