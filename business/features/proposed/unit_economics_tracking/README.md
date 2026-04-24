@@ -261,3 +261,84 @@ prompt systems that were drifting apart, and the cost delta
 (~$42/day at scale) is <2% of total spend. Prompt caching (forthcoming)
 erases the delta and then some. Quality win is measurable in unit
 tests; cost hit is bounded and temporary.
+
+**2026-04-23 (late)** — Shipped workers #332 (fantasy craft, 10th
+content-type ship) grows fantasy dialogue ~23k → 40k chars. Keeps
+under the 48k warning ceiling.
+
+**2026-04-24** — Shipped workers #333: Anthropic prompt caching wired
+into the streaming script path. MEASUREMENT UPDATE — the actual
+cacheable ratio (78%) is much higher than the earlier estimate in
+section "projected savings at scale" above, so real savings are
+**~3x the earlier conservative projection**.
+
+## Updated measurement (post #333)
+
+### Cache-split ratio (measured)
+
+For horror dialogue, 20min, realistic outline + research:
+
+- Static prefix (cacheable):  **33 572 chars / ~8 393 input tokens**
+- Dynamic suffix (per-episode): **9 436 chars / ~2 359 input tokens**
+- Total:                        42 kchars / ~10 752 input tokens
+- **Cacheable share: 78%** of input tokens
+
+Static prefix is **byte-identical** across different topics/outlines/
+research when the shape (genre, format, content_type, language,
+duration band, persona, rating) matches. This is what makes caching
+actually hit — same-shape re-runs within the 5-min TTL are served
+from cache at 10% of input price.
+
+### Per-episode cost (revised, Opus 4.7)
+
+| State                         | Input $/ep | Total $/ep | Note                         |
+|:------------------------------|:----------:|:----------:|:-----------------------------|
+| Pre-#331 (estimated)          | ~$0.086    | ~$2.336    | before composer bridge       |
+| Post-#331, no caching         |   $0.161   |   $2.411   | bridge fully lit, no caching |
+| Post-#333, cache miss         |   $0.157   |   $2.407   | write overhead (25%) only    |
+| Post-#333, cache hit          |   $0.048   |   $2.298   | 90% discount on static prefix|
+| Post-#333, 80% hit rate       |  ~$0.070   |  ~$2.320   | realistic steady-state       |
+
+### At scale (1 000 fiction episodes/day)
+
+| State                         | Input $/day | Output $/day | Total $/day | $/month   |
+|:------------------------------|------------:|-------------:|------------:|----------:|
+| Pre-#331 (estimate)           |       ~$86  |      $2 250  |      ~$2 336 | ~$70 080 |
+| Post-#331, no caching         |       $161  |      $2 250  |       $2 411 |  $72 330 |
+| **Post-#333, 80% hit rate**   |      **$70**|    **$2 250**|   **$2 320** |**$69 600**|
+| Post-#333, 100% hit rate      |        $48  |      $2 250  |       $2 298 |  $68 940 |
+
+**Net vs. pre-#331**: at 80% cache hit, we net ~$480/month savings
+while ALSO landing the content-type YAML bridge (quality win).
+
+**At 100% cache hit**: ~$1 140/month savings + quality win.
+
+**Opportunity cost avoided**: had #331 shipped without #333's caching
+follow-up, run rate would have been ~$2 250/month worse than baseline.
+
+## Realized-savings telemetry (to collect post-deploy)
+
+PR #333 adds `cache_read_input_tokens` and `cache_creation_input_tokens`
+fields to `StreamChunk` and `ProviderResponse`. These surface to the
+script worker logs when caching is enabled. Post-rollout, collect
+from Firestore `stages.job-script.llm_usage` (or equivalent debug
+path) to compute:
+
+- Realized cache hit rate: `cache_read / (cache_read + cache_create)`
+  aggregated over a 24h window.
+- Dollar savings: `(input_tokens_uncached_baseline - input_tokens_paid) *
+  $15/Mtok`.
+- Per-content_type breakdown (cache hits naturally cluster by shape,
+  so fiction/dialogue should hit higher than narration/monologue just
+  from relative volume).
+
+Expected ranges:
+- Fiction dialogue (high volume, stable shape): **85-95%** hit rate.
+- Narration: **60-80%** (lower volume → fewer same-shape hits in
+  5-min window).
+- Cold-start after deploy: **20-30%** for the first ~10 min, climbs
+  sharply once same-shape re-runs start happening.
+
+If observed rates materially differ from these bands, re-open the
+decision — either extend TTL to 1h (paid feature) or rethink which
+builders opt into cacheability.
