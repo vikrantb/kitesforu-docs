@@ -1,5 +1,7 @@
 # Homepage simplification brainstorm
 
+> **Status: CLOSED 2026-04-24.** All three implementation PRs (iteration-5 PR #1 / #2 / #3) shipped live to prod. Both feature flags (`feature_home_signed_out_v2` + `feature_home_signed_in_v2`) were flipped ON and then removed; legacy components (`HomeDashboard`, `SignedOutHero` v1, `PersonaSection`, `TemplateChip`, `SignedInHome` wrapper) deleted; `CreatorStatsStrip` ported to `/dashboard`; `BottomNav` 4th slot swapped to Car Mode (signed-in) / Search (signed-out); `/?view=X` legacy redirects in place. See `iteration-5-implementation.md` for the full closing summary with per-PR tracing.
+
 **Problem**: The KitesForU homepage tries to do too many things at once. New visitors don't know what the product is or what action they should take. The goal is to find a simpler, clearer shape.
 
 **Not this**: a quick polish pass or CSS cleanup.
