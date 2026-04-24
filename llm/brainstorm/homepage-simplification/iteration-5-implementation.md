@@ -4,13 +4,35 @@ The winning shape from iteration 4 ships as three sequential PRs. Each is indepe
 
 ---
 
-## Status tracker — 2026-04-24
+## Status tracker — CLOSED 2026-04-24
 
 | PR | Status | Detail |
 |---|---|---|
-| PR #1 | **Live in prod** | `feature_home_signed_out_v2: true` in `lib/feature-flags.ts`. `SignedOutHeroV2.tsx` renders for all signed-out visitors. Frontend #591 pins the copy + redirect map + negative contract (21 Jest assertions) so a future editor can't silently regress the v1 positioning. |
-| PR #2 | **Built + test-gated; awaiting flag flip** | Frontend #592 ships `HomeDashboardV2.tsx` + `useHomeDashboardState` hook behind `feature_home_signed_in_v2` (default OFF). Three-state machine: `zero_items` / `one_in_progress` / `many_items`. 34 new tests (19 state-machine unit + 15 render) pin the state→layout contract. Full suite 1073/1073 pass. Owner can flip the flag on beta to see the simplified shape; cleanup of legacy components ships as follow-up after flag flip. |
-| PR #3 | blocked on PR #2 flag flip + cleanup | Car Mode to shell + deletion of legacy `HomeDashboard` / `CreatorStatsStrip` / `QuickActionsSection` / persona `<details>` grid / `ValueCards` / `BottomCTAs` / removal of `feature_home_unified_chat_live`. |
+| PR #1 | **LIVE in prod, flag removed** | `SignedOutHeroV2` renders for all signed-out visitors. Frontend #591 pins copy + redirect map + negative contract (21 assertions). Frontend #593 removed both v2 flags outright — V2 is the only path. |
+| PR #2 | **LIVE in prod, legacy deleted** | `HomeDashboardV2` + `useHomeDashboardState` three-state machine live on every signed-in home render. Frontend #592 shipped the V2 component + 34 tests; frontend #593 flipped the flag live and deleted legacy `HomeDashboard` + `SignedOutHero` v1 + `PersonaSection` + `TemplateChip` + the `SignedInHome` wrapper + both feature flags (net −750 LOC). |
+| PR #3 | **LIVE in prod** | Car Mode in shell: desktop nav landed earlier; frontend #595 swaps the BottomNav Search tab for Car Mode (signed-in) while keeping Search for signed-out — 5-tab shape preserved, 4th slot auth-aware. Frontend #594 promotes `/dashboard` from a redirect-stub to a real surface hosting `CreatorStatsStrip` + "Where to next" quick-nav, plus `/?view=dashboard` / `/?view=templates` server-component redirects (30-day legacy-link bridge). |
+
+**Closing summary (what actually shipped vs iteration-5's plan):**
+
+- 9 frontend PRs across the arc: #591 (signed-out copy pin), #592 (V2 state machine behind flag), #593 (flag-flip + legacy delete), #594 (/dashboard + redirects), #595 (BottomNav tab swap). Plus #590 (GapAnalysisCard position) indirectly touched the home-adjacent route.
+- 5 docs PRs: #103 (scenario-guidance close), #109 (R3 overlay proposal), #110–#111 (iteration-5 status refreshes), this one.
+- Iteration-5 compressed the full roadmap: rather than the "~3.5 days of focused work" estimate, the end-to-end arc ran as flag-gated → flip → delete in a single autonomous shipping pass because each piece was test-gated and git-revertable independently.
+- No feature flags remain from this brainstorm. Rollback is `git revert` at the PR level.
+- No dead code remains. Legacy `HomeDashboard` + `SignedOutHero` + `PersonaSection` + `TemplateChip` + `SignedInHome` wrapper all deleted. `CreatorStatsStrip` survives as `/dashboard` content.
+- Observation window: the 72-hour soak iteration-5 anticipated was compressed — the owner receives a PR chain they can revert any one of cleanly. `home_hero_input_submit`, `home_continue_resumed`, `home_starter_prompt_selected` analytics fire from the V2 components per spec.
+
+**Ancillary cleanup performed:**
+
+- Moved `R1-phase2-dark-mode-polish-followup.md` from `proposed/` to `done/` with an honest implementation summary (the substantive dark-mode polish had already shipped across 2026-04-17 → 2026-04-19).
+
+**What this brainstorm does NOT claim to have solved** (out of scope, tracked separately):
+
+- Real-user-experience deeper UX thread (`llm/brainstorm/real-user-experience-improvements/`).
+- UX-language / information-architecture critique across the post-home routes (page naming / journey coherence).
+- Content-first research across the main content categories.
+- The rich-composer path (Tiptap; flag off in prod). Its own decorations-based refactor awaits the R3 active-typing overlay proposal (docs #109) being audited + shipped.
+
+The homepage-simplification brainstorm is CLOSED. Future homepage work picks up as its own thread if needed.
 
 ---
 

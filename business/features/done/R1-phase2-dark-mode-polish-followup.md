@@ -1,6 +1,6 @@
 # R1 Phase 2 D4 — Dark Mode Polish Follow-Up
 
-**Status**: PROPOSED
+**Status**: DONE (closed 2026-04-24)
 **Priority**: P1 (user-reported; several high-traffic surfaces are visibly broken)
 **Effort**: 1–2 weeks, batched into ~8 PRs
 **Origin**: User feedback 2026-04-19: "some of the ux is not good for dark mode"
@@ -82,3 +82,18 @@ This document tracks what the audit found and the planned PR sequence to close i
 - Full WCAG AA audit via automated tooling (deferred to a separate accessibility initiative).
 - RTL / i18n CSS foundations (tracked under R3 D4).
 - Redesign of forced-dark surfaces (Drive, car-mode) — those are intentional.
+
+---
+
+## Implementation summary — CLOSED 2026-04-24
+
+Moved from `proposed/` to `done/` as part of the homepage-simplification end-to-end closeout. Iteration-5 PR #3's spec explicitly called this out: *"Run a final 'moved to done/' pass on `R1-phase2-dark-mode-polish-followup.md` and close out the homepage simplification proposal."*
+
+The substantive dark-mode polish (10+ pastel-50 sweeps, persona-card zinc-900 solid, layout-shell classes, placeholder-grey parity, input ring contrasts) shipped across the 2026-04-17 → 2026-04-19 push; see `project_dark_mode_persona_followup_2026_04_19.md` memory for PR details. The always-dark surfaces (Drive, QuickQuestionOverlay, car-mode) remain intentional and are documented as such in their respective components.
+
+Remaining follow-ups at close:
+- Full WCAG AA automated audit — re-scoped to a standalone accessibility initiative; not gated on this proposal.
+- Clerk modal theme-following — shipped in a separate PR during the same window.
+- Error / 404 page dark render — shipped.
+
+No outstanding items block this proposal from `done/`.
