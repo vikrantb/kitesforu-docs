@@ -8,9 +8,9 @@ The winning shape from iteration 4 ships as three sequential PRs. Each is indepe
 
 | PR | Status | Detail |
 |---|---|---|
-| PR #1 | **Built + test-gated; awaiting flag flip** | `SignedOutHeroV2.tsx` shipped as flag-gated dead code behind `feature_home_signed_out_v2` (default OFF); frontend #591 adds 21 Jest assertions pinning the copy + redirect map + negative contract (no `B2B` / `executives` / `Mastery Companion` re-entry). Owner can now flip the flag on beta with CI-guaranteed copy stability. |
-| PR #2 | not started | signed-in 3-state dashboard — still the biggest piece. |
-| PR #3 | blocked on PR #2 | Car Mode to shell + cleanup. |
+| PR #1 | **Live in prod** | `feature_home_signed_out_v2: true` in `lib/feature-flags.ts`. `SignedOutHeroV2.tsx` renders for all signed-out visitors. Frontend #591 pins the copy + redirect map + negative contract (21 Jest assertions) so a future editor can't silently regress the v1 positioning. |
+| PR #2 | **Built + test-gated; awaiting flag flip** | Frontend #592 ships `HomeDashboardV2.tsx` + `useHomeDashboardState` hook behind `feature_home_signed_in_v2` (default OFF). Three-state machine: `zero_items` / `one_in_progress` / `many_items`. 34 new tests (19 state-machine unit + 15 render) pin the state→layout contract. Full suite 1073/1073 pass. Owner can flip the flag on beta to see the simplified shape; cleanup of legacy components ships as follow-up after flag flip. |
+| PR #3 | blocked on PR #2 flag flip + cleanup | Car Mode to shell + deletion of legacy `HomeDashboard` / `CreatorStatsStrip` / `QuickActionsSection` / persona `<details>` grid / `ValueCards` / `BottomCTAs` / removal of `feature_home_unified_chat_live`. |
 
 ---
 
