@@ -4,6 +4,16 @@ The winning shape from iteration 4 ships as three sequential PRs. Each is indepe
 
 ---
 
+## Status tracker — 2026-04-24
+
+| PR | Status | Detail |
+|---|---|---|
+| PR #1 | **Built + test-gated; awaiting flag flip** | `SignedOutHeroV2.tsx` shipped as flag-gated dead code behind `feature_home_signed_out_v2` (default OFF); frontend #591 adds 21 Jest assertions pinning the copy + redirect map + negative contract (no `B2B` / `executives` / `Mastery Companion` re-entry). Owner can now flip the flag on beta with CI-guaranteed copy stability. |
+| PR #2 | not started | signed-in 3-state dashboard — still the biggest piece. |
+| PR #3 | blocked on PR #2 | Car Mode to shell + cleanup. |
+
+---
+
 ## PR #1 — The signed-out landing: cut, clarify, commit
 
 **Scope**: replace `SignedOutHero.tsx` with the shape from iteration 4.
