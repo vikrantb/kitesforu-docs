@@ -103,14 +103,23 @@ Look for:
 
 ### Validate classifier is firing
 
-Create a test job with title "Night before your interview: a calm rehearsal" and check:
-- Firestore `podcast_jobs/<job_id>/preferences._episode_type` == `"final_prep"` (written by classifier per #353)
-- Firestore `podcast_jobs/<job_id>/stages.job-script.sections_included` contains `"episode_type_specialization"` (composer activated the craft block)
-- If the generated script contains "here's a new framework" or "one more technique":
-  - `stages.quality_gate.final_prep_no_new_material.new_material_hits` has entries
-  - `stages.quality_gate.regen_attempted == true`
-  - `stages.quality_gate.regen_reason` contains `"final_prep_new_material=..."`
-  - After retry: `stages.quality_gate.regen_resolved_reasons` contains `"final_prep_new_material"` if regen fixed it
+Create a test job with title "Night before your interview: a calm rehearsal". The classifier's effects are visible on two surfaces (Firestore and GCP Cloud Logging) but the **primary persistent signal** is the presence of `stages.quality_gate.final_prep_no_new_material` in Firestore — that metric key only populates when `run_quality_gate` is called with `episode_type="final_prep"`, which only happens when either (a) the user explicitly set `_episode_type` OR (b) the classifier resolved the title and wrote back to preferences per #353.
+
+**Validation signals, in order of reliability:**
+
+1. **Firestore (persisted, authoritative)** — `podcast_jobs/<job_id>/stages.quality_gate`:
+   - If `final_prep_no_new_material` key is **present** → episode_type was resolved to "final_prep" and the gate ran. Classifier fired (or user explicitly set it).
+   - If the generated script contained banned phrases like "here's a new framework":
+     - `stages.quality_gate.final_prep_no_new_material.new_material_hits` has entries
+     - `stages.quality_gate.regen_attempted == true`
+     - `stages.quality_gate.regen_reason` contains `"final_prep_new_material=..."`
+     - After retry: `stages.quality_gate.regen_resolved_reasons` contains `"final_prep_new_material"` if regen fixed it, or `regen_persisted_reasons` if it didn't.
+
+2. **GCP Cloud Logging (ephemeral but informative)** — filter on `resource.labels.service_name="kitesforu-worker-audio"` and look at structured `Composed prompt` log entries:
+   - `jsonPayload.sections_included` should contain `"episode_type_specialization"` for classifier-triggered jobs
+   - `jsonPayload.genre` and `jsonPayload.format` tell you which composer context the job used
+
+**NOT a reliable validation path**: checking `preferences._episode_type` in Firestore. The classifier's write-back per #353 mutates the in-memory dict within the worker process, but the workers do not currently write `preferences` back to Firestore after mutation. The in-memory mutation is visible to downstream code within the same worker invocation (which is all that matters for correctness), but it is NOT visible on the debug page. Check `stages.quality_gate.final_prep_no_new_material` presence as the authoritative Firestore signal instead.
 
 ### Aggregate resolution rates across jobs
 
