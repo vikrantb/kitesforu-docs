@@ -1,10 +1,26 @@
 # R3 — Platform, Growth & Distribution
 
-**Status**: PROPOSED
+**Status**: PARTIALLY SHIPPED (D1 + D2 + D3 + most of D4 shipped 2026-04 — D4 UI-string externalization + D5 team features remain; full close-out blocked on D5)
 **Priority**: P2
-**Effort**: 4 weeks
+**Effort**: 4 weeks (~2 weeks of D5 + UI-string work remaining)
 **Affected repos**: kitesforu-frontend, kitesforu-api, kitesforu-infrastructure
 **Depends on**: R1 (UX), R2 (content quality)
+
+## Status snapshot (2026-04-24)
+
+- **D1 RSS / distribution**: shipped end-to-end via api PR #248 + #256 + frontend #510 + #511. Public `/listen/{courseId}` page renders without auth, includes Apple/Spotify/Overcast subscribe links, MP3 download. Apple Podcasts validator scan + Spotify ingest are manual-QA tasks (not code).
+- **D2 Sharing**: shipped end-to-end (frontend #425/#426 closed remaining gaps + analytics).
+- **D3 Analytics**: shipped end-to-end (PRs #429–#435 trackers + #506 closed the silent-data-loss gap by adding `/api/analytics/events` and Cloud Logging emit). Admin dashboard (D3 last AC) is the lone deferred item.
+- **D4 i18n**: language selector + library badge + library filter + RTL foundation all shipped (PRs #427/#428/#489/#493). **UI-string externalization to `next-intl` NOT shipped** — this is the remaining D4 scope.
+- **D5 Team features**: **NOT shipped**. Team owner invite, shared library visibility, completion tracking, SCORM export for courses. Multi-week B2B work; needs its own sub-proposal before code.
+
+## Remaining shipping scope
+
+1. **D4 — UI-string externalization** (next-intl + 5 initial locales): scoped sweep through `app/`, `components/`, error messages. ~1 week.
+2. **D5 — Team features**: invite flow + Firestore team model + completion tracking surfaces + SCORM-for-courses extension. ~2 weeks. Needs its own proposal before code per triangulation rule.
+3. **D3 — Admin analytics dashboard** at `/admin/analytics`: small scope, ~2 days. Reads from Cloud Logging or BigQuery export.
+
+This proposal stays in `proposed/` until D5 lands. Future shipping picks up from the "Remaining shipping scope" list above.
 
 ---
 

@@ -1,11 +1,28 @@
 # R1 Phase 2 — UX Player & Consumption Experience
 
-**Status**: PROPOSED
+**Status**: DONE (2026-04-24 — D1–D5 substantively shipped; offline-downloads thread spawned separately)
 **Priority**: P0
 **Effort**: 3 weeks
 **Affected repos**: kitesforu-frontend
 **Depends on**: R1 Phase 1 (navigation + library)
 **Absorbs**: P1-speaker-visualization.md (existing proposal)
+
+## Implementation summary (2026-04-24 close-out)
+
+- **D1 — Persistent audio player**: `PersistentPlayerHost` at layout level; cross-page navigation preserves playback. Verified by kitetest `persistent-player.spec.ts` (PR #40, commit 580aeba). MediaSession integration persists across navigation.
+- **D2 — Speaker visualization**: 2-PR chain — workers #306 (segment duration persistence via pydub in `asyncio.to_thread`) + frontend #543 (`useCurrentSpeaker` + FullPlayer label). Voice Cast tab on detail pages shipped earlier via `VoiceCastSection`. Graceful degradation at every layer for legacy episodes lacking duration metadata.
+- **D3 — Car Mode + Q&A discoverability**: FullPlayer surfaces Car Mode and Q&A buttons; deep-link routes to `/drive?...&mode=live&qa=1` with auto-activated `QuickQuestionOverlay` (frontend PR #422). Episode pauses during Q&A per the no-speech-over-speech rule.
+- **D4 — Dark mode**: 20+ PRs (#370s–#418) covered ~68 components. Auto-on at night (8pm–7am) via `useTheme`. Respects `prefers-color-scheme`. Final follow-up sweeps (PR #450, plus 10 pastel-50 surface fixes) closed remaining gaps.
+- **D5 — Sleep timer**: fully shipped including end-of-episode (PR #420 via `lib/audio-events.ts` pub/sub). Gentle 3s volume fade.
+
+**Deferred to a separate thread (out of scope for this phase's closure)**:
+- **Offline downloads** (Service Worker + Cache API + download badge in library cards) — needs its own PWA proposal. Significant scope (asset caching, storage quota UX, offline playback). Filed as a future thread — no current proposal-level doc.
+
+**Manual / E2E follow-ups (non-blocking)**:
+- iOS Safari + AirPods manual device test.
+- Dark-mode Playwright visual regression — needs staging-config sharding so a single dark-mode spec can run scoped.
+
+This proposal is closed for shipping purposes. The offline-downloads thread will get its own proposal when prioritized.
 
 ---
 

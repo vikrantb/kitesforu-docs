@@ -1,10 +1,14 @@
 # R2 — Rich-Text Input with Inline File Attachments
 
-**Status**: PROPOSED
+**Status**: PROPOSED (no phases shipped yet; Phase 1 is the next pickup)
 **Owner**: Smart Create surface (frontend + API + extraction service)
 **Priority**: P2
 **Effort**: phased across ~4 weeks (Phase 1 → Phase 4; each independently shippable)
 **Origin**: 2026-04-19 product-owner review — "we dont have the user a way to copy paste or upload files… I would love if this is a rich text type of thing where user can properly provide attachments inline."
+
+## Pickup pointer (2026-04-24)
+
+Phase 1 (text-only Tiptap composer, ~1 week, frontend-only, zero risk to existing flow) is the right next pickup. Tiptap is the default tech pick (open question 13.1) — confirm before kickoff. RichComposer feature flag (`feature_rich_composer_live`) is currently OFF in production; Phase 1 ships behind the same flag and flips ON only after a 50-creation sanity review. No api / workers / schemas / extraction-service work needed for Phase 1. Phase 2 (PDF / DOCX extraction with presigned GCS) is where the multi-repo coordination begins — needs a follow-up proposal pass before code.
 
 ## 1. Problem
 

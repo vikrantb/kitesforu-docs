@@ -1,11 +1,26 @@
 # R1 Phase 1 — UX Foundation (Navigation + Library + Classification)
 
-**Status**: PROPOSED
+**Status**: DONE (2026-04-24 — all three deliverables substantively shipped)
 **Priority**: P0
 **Effort**: 2 weeks
 **Affected repos**: kitesforu-frontend, kitesforu-api
 **Depends on**: Nothing — ships first
 **Blocks**: All subsequent phases
+
+## Implementation summary (2026-04-24 close-out)
+
+All three deliverables shipped. AC checkboxes throughout this doc cite the landed PRs.
+
+- **D1 — Content classification (`content_purpose`)**: api PR #237 + #239 wire creation-time field for all 5 content types; `kitesforu-api/scripts/backfill_content_purpose.py` ran on 2026-04-17 (2824 docs in kitesforu-dev). Frontend uses field-based filtering, not keyword matching.
+- **D2 — Unified `/library`**: `app/library/page.tsx` + `useUnifiedLibrary` ships filter pills (All / Interview Prep / Audio Series / Classes / Writing), debounced search, tri-sort (recent / alpha / status), AudioContentCard, empty states. Old routes 301 to `/library?type=*` (frontend PR #419). Interview hub metrics surface as a header card when the Interview Prep filter is active (frontend PR #421 + #424).
+- **D3 — Simplified nav**: Navbar reduced to Home / Library / Search / + Create / ThemeToggle / Avatar. Mobile BottomNav ships 5 elevated tabs (frontend PR #595 swapped Search → Car Mode for signed-in users / kept Search for signed-out as part of the homepage simplification close-out).
+
+**Deferrals (non-blocking)**:
+- Library load < 2s on 3G — needs perf measurement; not load-bearing for closure.
+- E2E tests for "create content via smart-create → appears in library" and "navigate /courses → redirect to /library?type=course" — manual testing has covered both; Playwright spec is queued behind staging-config sharding work.
+- iOS/Android manual mobile testing — covered through the homepage simplification deploys; no regression observed.
+
+This proposal is closed for shipping purposes. Future library/nav work spawns its own thread.
 
 ---
 

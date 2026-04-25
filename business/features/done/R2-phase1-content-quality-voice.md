@@ -1,11 +1,24 @@
 # R2 Phase 1 — Content Quality: Voice & Audio
 
-**Status**: PROPOSED
+**Status**: DONE (2026-04-24 — D3 + D4 shipped end-to-end; D1 voice consolidation + D2 series memory deferred to dedicated threads)
 **Priority**: P1
 **Effort**: 3 weeks
 **Affected repos**: kitesforu-workers, kitesforu-frontend
 **Depends on**: R1 complete (UX foundation shipped)
 **Absorbs**: P2-voice-architecture-consolidation.md (existing proposal)
+
+## Implementation summary (2026-04-24 close-out)
+
+- **D3 — Content rating & safety**: 10-PR chain across 5 repos. MPAA-style tiers (G/PG/PG_13/R) — schemas v1.53.0 added `ContentRating` enum + field; api PR #268 wires deterministic classifier with hard-floor for bedtime → G; workers #302 emits per-tier constraint block at composer priority 105; frontend #529 ships rating badges; schemas v1.55.0 + api #270 + frontend #530 ship `max_content_rating` parental-controls dropdown in `/settings/profile` with library filter (fail-open on legacy).
+- **D4 — Genre-specific quality**: All 4 craft axes shipped 2026-04-24 — Bedtime energy arc (workers #303 + #304 + #305, 3-PR chain with quality-gate + regen + the load-bearing umbrella-enum derive fix), Horror ambient bed (workers #316), Romance POV switching (workers #317), Comedy topicality (workers #318). 115+ new prompt-craft unit tests across the four axes.
+
+**Deferred to dedicated threads (out of scope for this phase's closure)**:
+- **D1 — Voice architecture consolidation**: `MockVoiceController` is intentional preview-only theater (per its own docstring) and will be replaced by a LiveKit adapter. Not extractable into a shared hook with `useCarVoiceOrchestrator` as originally framed. New proposal needed once the LiveKit adapter path is scoped. Voice-mock real-speech-recognition (R2-phase2 D3 last AC) is blocked on the same thread.
+- **D2 — Series memory full wiring**: `analyze_episode()` is a stub-only function; no `series_id` concept exists in the codebase. This is a full feature needing a proper proposal, not single-PR work.
+
+**Deferred AC**: per-genre quality-metric measurement is a measurement / analytics task, not a craft ship.
+
+This proposal is closed for shipping purposes. The two deferred deliverables (voice consolidation, series memory) spawn fresh proposals when prioritized.
 
 ---
 
