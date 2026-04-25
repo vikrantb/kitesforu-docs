@@ -1,6 +1,6 @@
 # Car-Mode Audio Re-Sign — Layer 5b Follow-up
 
-**Status**: PROPOSED
+**Status**: PROPOSED (awaiting Codex audit before any code per triangulation rule)
 **Priority**: P1 (completes the 2026-04-23 horror-podcast audit; studio + library already self-heal — car-mode is the last uncovered consumer)
 **Affected repos**: kitesforu-api (new endpoint + car_mode signing service), kitesforu-workers (confirm `gcs_path` write on car-mode segments), kitesforu-frontend (thread `sessionId`/`segmentIndex` through drive hooks + generalize `resignSegmentAudioUrl`)
 **Grounding**: Layer 5b of the 2026-04-23 7-agent horror-podcast audit. Layer 5 (podcast studio + library) shipped in api #286 + workers #315 + frontend #586 + #587; see `business/features/done/audio_signed_urls/README.md`. This proposal extends the same pattern to the car-mode brainstorm path.

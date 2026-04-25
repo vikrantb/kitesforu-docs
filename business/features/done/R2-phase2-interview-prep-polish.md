@@ -1,11 +1,24 @@
 # R2 Phase 2 — Interview Prep Deep Polish
 
-**Status**: PROPOSED
+**Status**: DONE (2026-04-24 — D1–D5 substantively shipped; voice-mock real STT deferred to voice consolidation thread)
 **Priority**: P1
 **Effort**: 2 weeks
 **Affected repos**: kitesforu-frontend, kitesforu-api
 **Depends on**: R1 (UX), R2 Phase 1 (content quality)
 **Absorbs**: P2-mastery-ribbon-transparency.md (existing proposal)
+
+## Implementation summary (2026-04-24 close-out)
+
+- **D1 — Mastery ribbon transparency**: `MasteryTransitionToast` (frontend PR #423) renders qualitative reason for 3s. `buildTransitionReason` is pure-qualitative; load-bearing test pins "never leaks raw numeric values".
+- **D2 — Company-specific intelligence**: 3-PR chain (api #273 curriculum-builder + #274 gap-analysis + #275 Tavily-backed `company_research.py`). Canonical anchors per company (Amazon LPs, Google Googleyness + GCA, Meta coding-heavy, Microsoft collab-design, Apple craft, Netflix F&R, McKinsey/BCG/Bain case structure). 5s hard timeout, never-raises, never-invent. Activates when `TAVILY_API_KEY` set; falls back to training-data behavior otherwise.
+- **D3 — Mock interview improvements**: Company-specific question framing (schemas #77 + api #276); evaluation prompt emits `top_fix` / `rewrite` / `followup_question`; `ScoreTrendSparkline` (frontend PR #436) above the Mastery Traces ledger; follow-up questions probe weak answers when any dimension scores ≤ 2.0 or a STAR component is absent.
+- **D4 — Gap analysis integration**: api #252 persists + endpoint, frontend #492 ships `<GapAnalysisCard>` ABOVE `EpisodeList` per §4 (corrected via #590 + order-pin test on 2026-04-24); api #254 + frontend #494 add strengths section first; api #255 + frontend #496 link gaps to specific draft episode numbers.
+- **D5 — Interview Prep in unified library**: frontend #421 + #424 — dashboard header (active programs / modules / mock sessions / avg score) appears when Interview Prep filter is active; quick-launch buttons; non-sticky scroll behavior.
+
+**Deferred to a dedicated thread (out of scope for this phase's closure)**:
+- **Voice mock real speech recognition** (D3 final AC): blocked on R2 Phase 1 D1 voice architecture consolidation. Will land alongside the LiveKit adapter replacement of `MockVoiceController`.
+
+This proposal is closed for shipping purposes.
 
 ---
 

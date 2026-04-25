@@ -1,10 +1,22 @@
 # R1 Phase 3 — UX Creation Flow & Home Dashboard
 
-**Status**: PROPOSED
+**Status**: DONE (2026-04-24 — D1–D3 substantively shipped; smart-suggestions intent classifier deferred)
 **Priority**: P1
 **Effort**: 2 weeks
 **Affected repos**: kitesforu-frontend
 **Depends on**: R1 Phase 1 (navigation), R1 Phase 2 (player)
+
+## Implementation summary (2026-04-24 close-out)
+
+- **D1 — `/create` page**: `app/create/page.tsx` ships hero input + 5 use-case template sections (Career & Interview / Learning & Study / Teaching / Stories / Professional). Templates client-side, no API calls. Mobile = horizontal scroll rows.
+- **D2 — Personalized home dashboard**: `HomeDashboard.tsx` renders time-aware greeting, conditional Continue section, persona-adaptive Quick Actions, Recent (last 8), persona-relevant Recommended templates. Closed end-to-end via the homepage simplification arc (frontend PR #591 → #592 → #593 → #594 → #595, 2026-04-24): `feature_home_signed_in_v2` flag flipped and the legacy tree deleted (~−750 LOC). Both homepage feature flags removed outright.
+- **D3 — Smart-create classification improvement**: PR #239 ships the `<<QUICK:>>` chat-side clarifier when classification confidence is low. Three options (studying-prep / work / entertainment) render as quick-reply buttons.
+
+**Deferred items (non-blocking for this phase's closure)**:
+- **Smart suggestions on `/create`** (intent classifier appearing as user types in the hero input): needs an intent classifier endpoint not yet exposed. Future work, separate proposal needed if revisited.
+- **`content_purpose` semantic decision** (the AC about clarify-answer driving `content_purpose`): the code already uses `content_purpose` for content TYPE (course / class / writeup / podcast / interview_prep), not "studying / work / entertainment". The clarify answer drives `content_category` / `content_domain`. This is a docs/code naming decision; not load-bearing.
+
+This proposal is closed for shipping purposes. Future create-flow polish spawns its own thread.
 
 ---
 
