@@ -310,9 +310,68 @@ The following must be resolved before code lands. Each is the charter for one of
 
 ---
 
-## 11. Implementation summary (filled in after ship)
+## 11. Implementation summary (2026-04-25)
 
-_(Empty until phases land. Will list final PR numbers, deployed Cloud Run revisions, perf measurement results, and any deferred items.)_
+### What shipped
+
+| Phase | Repo | PR | Status |
+|---|---|---|---|
+| Phase 3 — API Cache-Control + weak ETag + 304 short-circuit | kitesforu-api | #290 | MERGED |
+| Phase 1 — TanStack Query foundation + per-user IndexedDB persistence | kitesforu-frontend | #602 | MERGED |
+| Phase 2 — home dashboard RSC pre-fetch + TanStack Query cutover | kitesforu-frontend | #603 | MERGED |
+| Phase 4 — mutation invalidation hookups + Providers SSR fix | kitesforu-frontend | #604 | MERGED |
+
+### Process
+
+- 4 parallel deep-research agents (Next.js RSC patterns, TanStack Query persistence, FastAPI ETag/Cache-Control, Clerk auth + cache-key correctness) ran simultaneously and informed all design decisions. Their outputs are referenced inline in PR descriptions.
+- 2 architect agents (frontend-architect + backend-architect) authored the concrete code patches grounded in repo specifics.
+- All local CI gates passed before merge per `feedback_local_cicd_discipline.md` (GitHub Actions are passthrough — local lint/type-check/test/build is the actual gate). Pyright/mypy diagnostic noise on import-resolve is workspace-config only and does not affect runtime.
+
+### Deviations from the v1 proposal
+
+- Original proposal said `Cache-Control: private, max-age=15, stale-while-revalidate=300`. Research synthesis (Agent 3) flagged that SWR can serve up to 5 min stale, which violates the 15s mutation-reflection SLO. Final: `private, max-age=15, must-revalidate`.
+- Original proposal said sha256-of-body ETag (~5ms). Research clarified sha256 of 20KB is ~80µs; switched to weak `W/"{count}-{max_updated_at_ms}"` (~5µs, deterministic across JSON serializer drift, no second JSON pass).
+- Original proposal kept invalidation in a single `invalidate.ts` helper. Final split into `invalidate.ts` (server-only) + `invalidateClient.ts` (client) because mixing `'server-only'` and `'use client'` pragmas in one module is forbidden.
+- Phase 2 originally planned to delete `lib/home/library-cache.ts` in a follow-up. Done in Phase 2 itself (with its test) — the old localStorage SWR is fully superseded by per-user IndexedDB persistence.
+- Phase 1 had a Providers component that returned bare `<>{children}</>` when Clerk hadn't loaded — caught only at Phase 4 build time. Crash: "No QueryClient set." Fix: two-stage mount (bare `QueryClientProvider` always; `PersistQueryClientProvider` overlays once Clerk resolves with `key={userId}`). Documented as the load-bearing SSR safeguard.
+
+### Test results
+
+- `kitesforu-api`: 27 new ETag tests pass (21 helper unit + 6 route-integration). Full suite 741 pass / 11 skip.
+- `kitesforu-frontend` Phase 1: 1123/1123 jest pass.
+- `kitesforu-frontend` Phase 2: 1112/1112 jest pass (1 deleted suite was for the removed library-cache.ts).
+- `kitesforu-frontend` Phase 4: 1112/1112 jest pass.
+- All `pnpm type-check`, `pnpm lint` (max-warnings=0 enforced via lint-staged), `pnpm build` green for every PR.
+
+### Performance posture (to be measured post-deploy on beta.kitesforu.com)
+
+Targets carried from §6:
+- First Contentful Paint: ≤ 600ms
+- Largest Contentful Paint: ≤ 800ms (was ~2.5–4s on cold API)
+- Cards rendered with data on first paint: YES
+- Repeat-visit perceived load: ≤ 100ms (IndexedDB restore)
+- Cross-tab nav `/library → /`: ≤ 200ms (in-memory hit)
+
+Mandatory post-deploy verification per `feedback_local_cicd_discipline.md` rule 11:
+- Hard refresh `beta.kitesforu.com/` — confirm cards render WITH data on first paint, no empty kite-skeleton wait.
+- Sign out + sign in as different user — confirm no cross-user data shown.
+- DevTools Network on second visit — home-dashboard query restored from IndexedDB (no API call).
+- Cloud Logging filter on `kitesforu-api` for `httpRequest.status=304` — should be 40-70% of total list requests under steady SPA traffic.
+
+### Knowledge sweep
+
+- `kitesforu/.claude/knowledge/data-fetching-architecture.md` — pattern doc for adding new cached read screens.
+- `kitesforu/CLAUDE.md` rule #14 — quick reference.
+- `kitesforu-frontend/CLAUDE.md` rules #12-15 — frontend-specific guidance.
+- `kitesforu-api/CLAUDE.md` rules #12-15 — API-specific guidance.
+
+### Deferred (with explicit rationale)
+
+- **Library page / course-detail / persona-picker cutover** — pattern is established; each is ~30 min when prioritized. Not in scope of this proposal.
+- **Cloud Run `min_instances=1` on frontend** — only if measurement post-deploy shows cold-start dominates LCP after this work. ~$8-25/mo if needed.
+- **Unified `/v1/home-dashboard` endpoint** — 3 parallel calls work fine with HTTP/2 multiplexing + per-call ETag short-circuits.
+- **Lower-priority mutation sites** (class clone, class join, debug-only course delete) — covered by 60s `unstable_cache` revalidate window + client `staleTime`.
+- **Memorystore Redis** — per-instance memory cache is sufficient at our scale.
 
 ---
 
