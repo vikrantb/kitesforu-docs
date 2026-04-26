@@ -310,16 +310,24 @@ The following must be resolved before code lands. Each is the charter for one of
 
 ---
 
-## 11. Implementation summary (2026-04-25)
+## 11. Implementation summary (2026-04-25 → 2026-04-26)
 
-### What shipped
+### What shipped + deployed
 
-| Phase | Repo | PR | Status |
-|---|---|---|---|
-| Phase 3 — API Cache-Control + weak ETag + 304 short-circuit | kitesforu-api | #290 | MERGED |
-| Phase 1 — TanStack Query foundation + per-user IndexedDB persistence | kitesforu-frontend | #602 | MERGED |
-| Phase 2 — home dashboard RSC pre-fetch + TanStack Query cutover | kitesforu-frontend | #603 | MERGED |
-| Phase 4 — mutation invalidation hookups + Providers SSR fix | kitesforu-frontend | #604 | MERGED |
+| Phase | Repo | PR | Merged | Cloud Build | Cloud Run revision |
+|---|---|---|---|---|---|
+| Phase 3 — API Cache-Control + weak ETag + 304 short-circuit | kitesforu-api | #290 | ✅ SHA `6eda636` | ✅ build `6310b019` | ✅ `kitesforu-api-00530-f26` |
+| Phase 1 — TanStack Query foundation + per-user IndexedDB persistence | kitesforu-frontend | #602 | ✅ | (rolled into Phase 5 build) | (rolled into Phase 5 deploy) |
+| Phase 2 — home dashboard RSC pre-fetch + TanStack Query cutover | kitesforu-frontend | #603 | ✅ | (rolled into Phase 5 build) | (rolled into Phase 5 deploy) |
+| Phase 4 — mutation invalidation hookups + Providers SSR fix | kitesforu-frontend | #604 | ✅ | (rolled into Phase 5 build) | (rolled into Phase 5 deploy) |
+| **Phase 5 — RSC streaming hotfix (await→void) + dehydrate pending queries** | kitesforu-frontend | **#605** | ✅ SHA `e527a5a` | ✅ build `bcc1c5d1` | ✅ kitesforu-frontend-00694-d2t |
+
+### Critical post-merge incident + fix
+
+After "merging" the 4 phases, the user came back and said the page felt SLOWER. Diagnosis surfaced TWO bugs:
+
+1. **Merging ≠ deploying.** GitHub Actions are intentionally a passthrough/no-op (cost). Cloud Run was still serving `kitesforu-frontend-00693-l45` and `kitesforu-api-00529-86f` — the pre-Phase work. None of the merged PRs had reached prod. Memory rule `feedback_merging_is_not_deployment.md` codified to prevent recurrence: "MERGING IS NOT DEPLOYMENT" — exit criteria is users on `beta.kitesforu.com` matching the merged commit SHA.
+2. **`await` instead of `void` on `prefetchQuery` in `app/page.tsx` would have made the deploy WORSE, not better.** Awaiting the prefetch blocks SSR on Clerk getToken (50–200ms) + 3 parallel API calls (300–800ms) before any byte reaches the browser — defeats the entire point of RSC streaming. Phase 5 hotfix swaps to `void` and updates `shouldDehydrateQuery` to OR with `pending` so in-flight prefetches survive HydrationBoundary into the client. Discovered via deploy verification audit BEFORE the bad code reached prod.
 
 ### Process
 
